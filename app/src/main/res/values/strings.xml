@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">3rd</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="menu_home">Home</string>
+    <string name="menu_analytics">Analytics</string>
+    <string name="menu_about_us">About Us</string>
+    <string name="hint_email">Email</string>
+    <string name="hint_password">Password</string>
+    <string name="btn_login">Login</string>
+    <string name="btn_register">Register</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="email">Enter your email</string>
+    <string name="password">Password</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="box_top_price">Top Price</string>
+    <string name="box_best_sale">Best Sale</string>
+    <string name="box_num_sales">Number of Sales (Today)</string>
+    <string name="box_income">Income for the Day</string>
+    <string name="app_title">Progress</string>
+    <string name="app_tagline">Track, Plan, and Achieve Your Goals</string>
+    <string name="app_description">Progress is your personal productivity companion. Stay organized, monitor your growth, and accomplish more every day.\n\nThis is just sample text — you can replace it anytime with your real content.</string>
+    <string name="project_name">Group 6 Project</string>
+    <string name="project_subtitle">Awesome Android App</string>
+</resources>

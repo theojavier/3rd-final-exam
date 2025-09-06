@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/nav_home">
+
+    <fragment
+        android:id="@+id/nav_home"
+        android:name="com.example.a3rd.ui.home.HomeFragment"
+        android:label="@string/menu_home"
+        tools:layout="@layout/home" >
+        <action
+            android:id="@+id/action_nav_home_to_nav_analytics"
+            app:destination="@id/nav_analytics" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_about_us"
+        android:name="com.example.a3rd.ui.gallery.GalleryFragment"
+        android:label="@string/menu_about_us"
+        tools:layout="@layout/about_us" />
+
+    <fragment
+        android:id="@+id/nav_analytics"
+        android:name="com.example.a3rd.ui.slideshow.SlideshowFragment"
+        android:label="menu_analytics"
+        tools:layout="@layout/analytics" >
+        <action
+            android:id="@+id/action_nav_analytics_to_nav_about_us"
+            app:destination="@id/nav_about_us" />
+    </fragment>
+    <fragment
+        android:id="@+id/nav_login"
+        android:name="com.example.a3rd.ui.auth.LoginFragment"
+        android:label="Login"
+        tools:layout="@layout/login" >
+        <action
+            android:id="@+id/action_nav_login_to_nav_register"
+            app:destination="@id/nav_register" />
+        <action
+            android:id="@+id/action_nav_login_to_nav_forgot"
+            app:destination="@id/nav_forgot" />
+        <action
+            android:id="@+id/action_nav_login_to_nav_home"
+            app:destination="@id/nav_home" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_register"
+        android:name="com.example.a3rd.ui.auth.RegisterFragment"
+        android:label="Register"
+        tools:layout="@layout/register" />
+
+    <fragment
+        android:id="@+id/nav_forgot"
+        android:name="com.example.a3rd.ui.auth.ForgotFragment"
+        android:label="Forgot Password"
+        tools:layout="@layout/forget" />
+
+</navigation>
