@@ -1,38 +1,45 @@
 package com.example.a3rd.ui.auth;
 
 import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
-import androidx.appcompat.app.AppCompatActivity;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 
 import com.example.a3rd.R;
 
-public class ForgotFragment extends AppCompatActivity {
+public class ForgotFragment extends Fragment {
 
-    EditText emailField;
-    Button sendButton;
+    private EditText emailField;
+    private Button sendButton;
 
+    @Nullable
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.forget); // link with forget.xml
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
+        View root = inflater.inflate(R.layout.forget, container, false);
 
-        emailField = findViewById(R.id.forgetEmail);
-        sendButton = findViewById(R.id.btnSendReset);
+        emailField = root.findViewById(R.id.forgetEmail);
+        sendButton = root.findViewById(R.id.btnSendReset);
 
         sendButton.setOnClickListener(v -> {
             String email = emailField.getText().toString().trim();
 
             if (email.isEmpty()) {
-                Toast.makeText(this, "Please enter your email", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Please enter your email", Toast.LENGTH_SHORT).show();
             } else {
-                // 🔴 Normally you check with your server if this email exists
-                // Example: call API -> if exists, send email reset link
-                Toast.makeText(this, "Reset link sent to " + email, Toast.LENGTH_LONG).show();
-
+                Toast.makeText(getContext(), "Reset link sent to " + email, Toast.LENGTH_LONG).show();
                 // TODO: Replace this with server request to send reset link
             }
         });
+
+        return root;
     }
 }

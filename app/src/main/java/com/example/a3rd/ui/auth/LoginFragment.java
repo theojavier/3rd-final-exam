@@ -24,7 +24,7 @@ public class LoginFragment extends Fragment {
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_login, container, false);
+        View root = inflater.inflate(R.layout.login, container, false);
 
         etUsername = root.findViewById(R.id.Email);
         etPassword = root.findViewById(R.id.Password);
@@ -37,12 +37,12 @@ public class LoginFragment extends Fragment {
             String pass = etPassword.getText().toString();
 
             if (user.equals("admin") && pass.equals("1234")) {
-                Navigation.findNavController(v).navigate(R.id.homeFragment);
+                Navigation.findNavController(v).navigate(R.id.nav_home);
             }
         });
 
         tvRegister.setOnClickListener(v -> {
-            Navigation.findNavController(v).navigate(R.id.RegisterFragment);
+            Navigation.findNavController(v).navigate(R.id.nav_register);
         });
 
         tvForgot.setOnClickListener(v -> {
