@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">3rd</string>
+    <string name="app_name">""</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="nav_header_title">Android Studio</string>
@@ -8,6 +8,8 @@
     <string name="action_settings">Settings</string>
 
     <string name="menu_home">Home</string>
+    <string name="myclass">My Classes</string>
+    <string name="myschedule">My Schedule</string>
     <string name="menu_analytics">Analytics</string>
     <string name="menu_about_us">About Us</string>
     <string name="hint_email">Email</string>
@@ -27,4 +29,5 @@
     <string name="app_description">Progress is your personal productivity companion. Stay organized, monitor your growth, and accomplish more every day.\n\nThis is just sample text — you can replace it anytime with your real content.</string>
     <string name="project_name">Group 6 Project</string>
     <string name="project_subtitle">Awesome Android App</string>
+    <string name="notifications">Awesome Android App</string>
 </resources>
