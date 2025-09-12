@@ -5,14 +5,11 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Menu;
 import android.widget.TextView;
-import android.widget.ImageView;
 import android.view.MenuItem;
-import android.graphics.Color;
-import android.text.SpannableString;
-import android.text.style.ForegroundColorSpan;
 
 import com.google.android.material.navigation.NavigationView;
 
+import androidx.fragment.app.Fragment;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
@@ -22,22 +19,26 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.annotation.NonNull;
 import androidx.core.view.GravityCompat;
 
-import java.util.Arrays;
-import java.util.List;
-import android.view.SubMenu;
+import android.widget.Toast;
 
 import com.example.a3rd.databinding.ActivityMainBinding;
 
-public class MainActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener {   // ✅ correct implements
+public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
+    private boolean isLoginScreen() {
+        Fragment fragment = getSupportFragmentManager()
+                .findFragmentById(R.id.nav_host_fragment_content_main);
+        return (fragment instanceof LoginFragment ||
+                fragment instanceof RegisterFragment ||
+                fragment instanceof ForgotFragment);
+    }
+    private DrawerLayout drawer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
@@ -49,7 +50,7 @@ public class MainActivity extends AppCompatActivity
         NavigationView navigationView = binding.navView;
 
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_analytics, R.id.nav_about_us)
+                R.id.nav_home, R.id.nav_schedule)
                 .setOpenableLayout(drawer)
                 .build();
 
@@ -57,52 +58,34 @@ public class MainActivity extends AppCompatActivity
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
         NavigationUI.setupWithNavController(navigationView, navController);
 
-        // ✅ Listen for nav item clicks
         navigationView.setNavigationItemSelectedListener(this);
 
-        // ✅ Example: Add submenu items dynamically
-        Menu menu = navigationView.getMenu();
-        MenuItem myClasses = menu.findItem(R.id.nav_my_classes);
+        // 🔹 Listen for destination changes (Login, Register, Forgot → hide toolbar & drawer)
+        navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+            int id = destination.getId();
 
-        SubMenu subMenu = myClasses.getSubMenu();
-        if (subMenu == null) {
-            subMenu = menu.addSubMenu(R.id.nav_my_classes, Menu.NONE, Menu.NONE, "Classes");
-        }
-
-        List<String> serverClasses = Arrays.asList("Math", "Science", "English", "Exam Schedule");
-        subMenu.clear();
-
-        for (int i = 0; i < serverClasses.size(); i++) {
-            subMenu.add(R.id.nav_my_classes, Menu.FIRST + i, Menu.NONE, serverClasses.get(i))
-                    .setIcon(R.drawable.ic_class_black) // ✅ your class icon
-                    .setCheckable(true);
-        }
-
-        for (int i = 0; i < subMenu.size(); i++) {
-            MenuItem item = subMenu.getItem(i);
-            SpannableString spanString = new SpannableString(item.getTitle());
-            spanString.setSpan(new ForegroundColorSpan(Color.BLACK), 0, spanString.length(), 0);
-            item.setTitle(spanString);
-        }
-
-        // ✅ Middle logo → go home
-        ImageView logo = binding.appBarMain.toolbar.findViewById(R.id.toolbar_logo);
-        logo.setOnClickListener(v -> {
-            navController.navigate(R.id.nav_home);
+            if (id == R.id.action_nav_login_to_nav_register || id == R.id.action_nav_login_to_nav_home || id == R.id.action_nav_login_to_nav_forgot) {
+                // Hide toolbar + disable drawer
+                binding.appBarMain.toolbar.setVisibility(View.GONE);
+                drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+            } else {
+                // Show toolbar + enable drawer
+                binding.appBarMain.toolbar.setVisibility(View.VISIBLE);
+                drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
+            }
         });
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main, menu);
-
         MenuItem menuItem = menu.findItem(R.id.action_notifications);
         menuItem.setActionView(R.layout.notification_badge);
 
         View actionView = menuItem.getActionView();
         TextView badgeTextView = actionView.findViewById(R.id.notification_badge);
 
-        int notificationCount = 50; // example value
+        int notificationCount = 0; // example value
         if (notificationCount > 0) {
             badgeTextView.setText(String.valueOf(notificationCount));
             badgeTextView.setVisibility(View.VISIBLE);
@@ -129,7 +112,15 @@ public class MainActivity extends AppCompatActivity
         } else if (id == R.id.action_notifications) {
             return true;
         } else if (id == R.id.action_logout) {
+            // Close the app from MainActivity
+            finishAffinity(); // Close all activities
+            System.exit(0);   // Kill the process
             return true;
+        } else if (item.getGroupId() == R.id.nav_my_exam) {
+            // 🔹 Handle subject click
+            String subjectName = item.getTitle().toString();
+            Toast.makeText(this, "Clicked: " + subjectName, Toast.LENGTH_SHORT).show();
+            // Later → navigate to subject fragment
         }
 
         return super.onOptionsItemSelected(item);
@@ -146,6 +137,8 @@ public class MainActivity extends AppCompatActivity
 
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
+
         return true;
     }
+
 }

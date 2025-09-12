@@ -49,12 +49,12 @@
                         android:background="@android:color/darker_gray"
                         android:textColor="@android:color/white" />
 
-                    <TextView android:text="Mon" style="@style/ScheduleCell"/>
-                    <TextView android:text="Tue" style="@style/ScheduleCell"/>
-                    <TextView android:text="Wed" style="@style/ScheduleCell"/>
-                    <TextView android:text="Thu" style="@style/ScheduleCell"/>
-                    <TextView android:text="Fri" style="@style/ScheduleCell"/>
-                    <TextView android:text="Sat" style="@style/ScheduleCell"/>
+                    <TextView android:text="Mon" style="@style/BigScheduleCell"/>
+                    <TextView android:text="Tue" style="@style/BigScheduleCell"/>
+                    <TextView android:text="Wed" style="@style/BigScheduleCell"/>
+                    <TextView android:text="Thu" style="@style/BigScheduleCell"/>
+                    <TextView android:text="Fri" style="@style/BigScheduleCell"/>
+                    <TextView android:text="Sat" style="@style/BigScheduleCell"/>
                 </TableRow>
 
                 <!-- Time Slots (7am–7pm) -->

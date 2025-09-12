@@ -7,26 +7,23 @@
 
         <item
             android:id="@+id/nav_home"
-            android:icon="@drawable/home"
+            android:icon="@drawable/home1"
             android:title="@string/menu_home" />
 
         <!-- 🔹 Dropdown for Classes -->
         <item
-            android:id="@+id/nav_my_classes"
+            android:id="@+id/nav_my_exam"
             android:icon="@drawable/myclass"
-            android:title="@string/myclass"
-            android:checkable="false"
-            app:actionLayout="@layout/nav_dropdown_action" />
+            app:iconTint="@color/black"
+            android:title="@string/myexam"
+            android:checkable="false">
+        </item>
 
         <item
             android:id="@+id/nav_myschedule"
             android:icon="@drawable/schedule"
             android:title="@string/myschedule" />
 
-        <item
-            android:id="@+id/nav_about_us"
-            android:icon="@drawable/ic_menu_about_us"
-            android:title="@string/menu_about_us" />
 
     </group>
 </menu>

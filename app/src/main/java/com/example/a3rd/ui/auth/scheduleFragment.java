@@ -1,5 +1,4 @@
 package com.example.a3rd.ui.auth;
-
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,7 +10,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.a3rd.R;
 
-public class RegisterFragment extends Fragment {
+public class scheduleFragment extends Fragment {
 
     @Nullable
     @Override
@@ -19,6 +18,6 @@ public class RegisterFragment extends Fragment {
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.register, container, false);
+        return inflater.inflate(R.layout.exam_history, container, false);
     }
 }
