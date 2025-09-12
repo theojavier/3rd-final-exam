@@ -24,7 +24,7 @@
     <style name="BigScheduleHeader">
         <item name="android:gravity">center</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:background">@drawable/cell_border</item>
+        <item name="android:background">@drawable/exam_cell_background</item>
         <item name="android:textColor">@android:color/white</item>
         <item name="android:padding">12dp</item>
         <item name="android:minWidth">80dp</item>
@@ -35,7 +35,7 @@
     <style name="BigScheduleTime">
         <item name="android:gravity">center</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:background">@drawable/cell_border</item>
+        <item name="android:background">@drawable/exam_cell_background</item>
         <item name="android:textColor">@android:color/black</item>
         <item name="android:padding">12dp</item>
         <item name="android:minWidth">80dp</item>
@@ -45,7 +45,7 @@
     <!-- Bigger cells -->
     <style name="BigScheduleCell">
         <item name="android:gravity">center</item>
-        <item name="android:background">@drawable/cell_border</item>
+        <item name="android:background">@drawable/exam_cell_background</item>
         <item name="android:textColor">@android:color/black</item>
         <item name="android:padding">12dp</item>
         <item name="android:minWidth">80dp</item>

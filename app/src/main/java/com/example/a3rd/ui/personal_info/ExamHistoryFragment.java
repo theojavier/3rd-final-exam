@@ -1,11 +1,14 @@
-package com.example.a3rd.ui.exam;
+package com.example.a3rd.ui.personal_info;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.Fragment; // ✅ Use Fragment, not AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -21,7 +24,7 @@ import com.google.firebase.firestore.QuerySnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ExamHistoryActivity extends AppCompatActivity {
+public class ExamHistoryFragment extends Fragment {
 
     private RecyclerView recyclerView;
     private ExamHistoryAdapter adapter;
@@ -30,20 +33,21 @@ public class ExamHistoryActivity extends AppCompatActivity {
     private FirebaseFirestore firestore;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.exam_history);
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.exam_history, container, false);
 
-        recyclerView = findViewById(R.id.recyclerExamHistory);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView = view.findViewById(R.id.recyclerExamHistory);
+        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         historyList = new ArrayList<>();
         adapter = new ExamHistoryAdapter(historyList);
         recyclerView.setAdapter(adapter);
 
         firestore = FirebaseFirestore.getInstance();
-
         loadExamHistory();
+
+        return view;
     }
 
     private void loadExamHistory() {
@@ -63,7 +67,7 @@ public class ExamHistoryActivity extends AppCompatActivity {
                             }
                             adapter.notifyDataSetChanged();
                         } else {
-                            Toast.makeText(ExamHistoryActivity.this,
+                            Toast.makeText(requireContext(),
                                     "Error loading exam history",
                                     Toast.LENGTH_SHORT).show();
                             Log.e("ExamHistory", "Error getting data", task.getException());

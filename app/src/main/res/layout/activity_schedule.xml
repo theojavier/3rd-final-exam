@@ -31,6 +31,7 @@
 
 
             <TableLayout
+                android:id="@+id/schedule_table"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:divider="@android:color/black"
@@ -55,11 +56,13 @@
                     <TextView android:text="Thu" style="@style/BigScheduleCell"/>
                     <TextView android:text="Fri" style="@style/BigScheduleCell"/>
                     <TextView android:text="Sat" style="@style/BigScheduleCell"/>
+                    <TextView android:text="Sun" style="@style/BigScheduleCell"/>
                 </TableRow>
 
                 <!-- Time Slots (7am–7pm) -->
                 <TableRow>
                     <TextView android:text="7:00 – 8:00 AM" style="@style/BigScheduleTime"/>
+                    <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
@@ -74,8 +77,10 @@
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
+                    <TextView style="@style/BigScheduleCell"/>
                 </TableRow>
                 <TableRow><TextView android:text="9:00 – 10:00 AM" style="@style/BigScheduleTime"/>
+                    <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
@@ -90,8 +95,10 @@
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
+                    <TextView style="@style/BigScheduleCell"/>
                 </TableRow>
                 <TableRow><TextView android:text="11:00 – 12:00 PM" style="@style/BigScheduleTime"/>
+                    <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
@@ -106,8 +113,10 @@
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
+                    <TextView style="@style/BigScheduleCell"/>
                 </TableRow>
                 <TableRow><TextView android:text="1:00 – 2:00 PM" style="@style/BigScheduleTime"/>
+                    <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
@@ -122,8 +131,10 @@
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
+                    <TextView style="@style/BigScheduleCell"/>
                 </TableRow>
                 <TableRow><TextView android:text="3:00 – 4:00 PM" style="@style/BigScheduleTime"/>
+                    <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
@@ -138,6 +149,7 @@
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
+                    <TextView style="@style/BigScheduleCell"/>
                 </TableRow>
                 <TableRow><TextView android:text="5:00 – 6:00 PM" style="@style/BigScheduleTime"/>
                     <TextView style="@style/BigScheduleCell"/>
@@ -146,8 +158,10 @@
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
+                    <TextView style="@style/BigScheduleCell"/>
                 </TableRow>
                 <TableRow><TextView android:text="6:00 – 7:00 PM" style="@style/BigScheduleTime"/>
+                    <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>
                     <TextView style="@style/BigScheduleCell"/>

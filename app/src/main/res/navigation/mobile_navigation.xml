@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/nav_login">
+    app:startDestination="@+id/nav_home">
 
     <fragment
         android:id="@+id/nav_home"
@@ -12,14 +12,33 @@
         tools:layout="@layout/fragment_home" >
         <action
             android:id="@+id/action_nav_home_to_nav_analytics"
-            app:destination="@id/nav_schedule" />
+            app:destination="@id/nav_myschedule" />
+        <action
+            android:id="@+id/action_nav_home_to_nav_exam_item_page"
+            app:destination="@id/nav_exam_item_page" />
     </fragment>
+    <fragment
+        android:id="@+id/nav_profile"
+        android:name="com.example.a3rd.ui.personal_info.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile" />
+    <fragment
+        android:id="@+id/nav_exam_item_page"
+        android:name="com.example.a3rd.ui.exam.ExamFragment"
+        android:label="Profile"
+        tools:layout="@layout/exam_layout" />
 
     <fragment
-        android:id="@+id/nav_schedule"
-        android:name="com.example.a3rd.ui.auth.scheduleFragment"
+        android:id="@+id/nav_exam_history"
+        android:name="com.example.a3rd.ui.personal_info.ExamHistoryFragment"
+        android:label="Exam History"
+        tools:layout="@layout/exam_history" />
+
+    <fragment
+        android:id="@+id/nav_myschedule"
+        android:name="com.example.a3rd.ui.home.ScheduleFragment"
         android:label="menu_schedile"
-        tools:layout="@layout/exam_history" >
+        tools:layout="@layout/activity_schedule" >
     </fragment>
     <fragment
         android:id="@+id/nav_login"

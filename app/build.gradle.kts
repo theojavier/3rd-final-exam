@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
 }
 
@@ -59,4 +58,8 @@ dependencies {
     // Firebase SDKs you want
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-database")
+    // Glide for loading profile images
+    // Glide in Kotlin DSL
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+
 }

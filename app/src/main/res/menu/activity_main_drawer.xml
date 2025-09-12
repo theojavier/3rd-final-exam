@@ -12,7 +12,7 @@
 
         <!-- 🔹 Dropdown for Classes -->
         <item
-            android:id="@+id/nav_my_exam"
+            android:id="@+id/nav_exam_item_page"
             android:icon="@drawable/myclass"
             app:iconTint="@color/black"
             android:title="@string/myexam"
