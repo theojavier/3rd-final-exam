@@ -27,13 +27,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
-    private boolean isLoginScreen() {
-        Fragment fragment = getSupportFragmentManager()
-                .findFragmentById(R.id.nav_host_fragment_content_main);
-        return (fragment instanceof LoginFragment ||
-                fragment instanceof RegisterFragment ||
-                fragment instanceof ForgotFragment);
-    }
+
     private DrawerLayout drawer;
 
     @Override
@@ -64,7 +58,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
             int id = destination.getId();
 
-            if (id == R.id.action_nav_login_to_nav_register || id == R.id.action_nav_login_to_nav_home || id == R.id.action_nav_login_to_nav_forgot) {
+            if ( id == R.id.action_nav_login_to_nav_home || id == R.id.action_nav_login_to_nav_forgot) {
                 // Hide toolbar + disable drawer
                 binding.appBarMain.toolbar.setVisibility(View.GONE);
                 drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
