@@ -31,4 +31,5 @@
     <string name="project_subtitle">Awesome Android App</string>
     <string name="notifications">Awesome Android App</string>
     <string name="blank">--</string>
+    <string name="student_id">Student number</string>
 </resources>

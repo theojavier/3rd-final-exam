@@ -1,10 +1,14 @@
 package com.example.a3rd.ui.personal_info;
+
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -12,10 +16,6 @@ import androidx.fragment.app.Fragment;
 
 import com.bumptech.glide.Glide;
 import com.example.a3rd.R;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 public class ProfileFragment extends Fragment {
@@ -24,7 +24,6 @@ public class ProfileFragment extends Fragment {
     private TextView labelName, labelStudentNo, labelGender, labelDob, labelCivil,
             labelNationality, labelProgram, labelYearBlock, labelSemester;
 
-    private FirebaseAuth auth;
     private FirebaseFirestore firestore;
 
     @Nullable
@@ -45,7 +44,6 @@ public class ProfileFragment extends Fragment {
         labelYearBlock = view.findViewById(R.id.label_year_block);
         labelSemester = view.findViewById(R.id.label_semester);
 
-        auth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
 
         loadProfile();
@@ -54,33 +52,56 @@ public class ProfileFragment extends Fragment {
     }
 
     private void loadProfile() {
-        String userId = auth.getCurrentUser().getUid();
+        SharedPreferences prefs = requireContext().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+        String userId = prefs.getString("userId", null);
+
+        if (userId == null) {
+            Toast.makeText(getContext(), "User not logged in", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         firestore.collection("users").document(userId)
                 .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        DocumentSnapshot doc = task.getResult();
+                .addOnSuccessListener(doc -> {
+                    if (doc.exists()) {
+                        labelName.setText("Name: " + doc.getString("name"));
+                        labelStudentNo.setText("Student No.: " + doc.getString("studentId"));
+                        labelGender.setText("Gender: " + doc.getString("gender"));
 
-                        labelName.setText(doc.getString("name"));
-                        labelStudentNo.setText(doc.getString("studentNo"));
-                        labelGender.setText(doc.getString("gender"));
-                        labelDob.setText(doc.getString("dob"));
-                        labelCivil.setText(doc.getString("civilStatus"));
-                        labelNationality.setText(doc.getString("nationality"));
-                        labelProgram.setText(doc.getString("program"));
-                        labelYearBlock.setText(doc.getString("yearBlock"));
-                        labelSemester.setText(doc.getString("semester"));
+                        // dob vs ddb check
+                        String dob = doc.contains("dob") ? doc.getString("dob") : doc.getString("ddb");
+                        labelDob.setText("Date of Birth: " + (dob != null ? dob : "N/A"));
 
-                        // Load profile image if URL exists
+                        labelCivil.setText("Civil Status: " + doc.getString("civilStatus"));
+                        labelNationality.setText("Nationality: " + doc.getString("nationality"));
+                        labelProgram.setText("Program: " + doc.getString("program"));
+
+                        // 🔹 FIX: Firestore field is "tearBlock"
+                        String yearBlock = doc.getString("yearBlock");
+                        labelYearBlock.setText("Year/Block: " + (yearBlock != null ? yearBlock : "N/A"));
+
+                        labelSemester.setText("Semester: " + doc.getString("semester"));
+
+                        // 🔹 FIX: Ensure Imgur direct link
                         String imageUrl = doc.getString("profileImage");
                         if (imageUrl != null && !imageUrl.isEmpty()) {
+                            if (imageUrl.contains("imgur.com") && !imageUrl.contains("i.imgur.com")) {
+                                // convert to direct link if user pasted page link
+                                imageUrl = imageUrl.replace("imgur.com", "i.imgur.com") + ".jpg";
+                            }
+
                             Glide.with(requireContext())
                                     .load(imageUrl)
                                     .placeholder(R.drawable.ic_person)
+                                    .error(R.drawable.ic_person) // fallback if broken link
                                     .into(profileImage);
                         }
+                    } else {
+                        Toast.makeText(getContext(), "Profile not found", Toast.LENGTH_SHORT).show();
                     }
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(getContext(), "Error loading profile", Toast.LENGTH_SHORT).show();
                 });
     }
 }

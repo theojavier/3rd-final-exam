@@ -62,6 +62,14 @@ public class MainActivity extends AppCompatActivity  {
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
         NavigationUI.setupWithNavController(navigationView, navController);
 
+        // 🔹 Click logo → navigate Home
+        ImageView logo = findViewById(R.id.toolbar_logo);
+        logo.setOnClickListener(v -> {
+            navController.popBackStack(R.id.nav_home, false); // clears backstack to Home
+            navController.navigate(R.id.nav_home);
+        });
+
+
         // Hide toolbar & drawer for login/forgot fragments
         navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
             int id = destination.getId();

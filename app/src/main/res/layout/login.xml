@@ -15,13 +15,14 @@
         android:src="@drawable/istockphoto_1401106927_612x612_removebg_preview" />
 
     <EditText
-        android:id="@+id/Email"
+        android:id="@+id/student_id"
         android:layout_width="306dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="80dp"
         android:background="@android:drawable/edit_text"
-        android:hint="@string/email"
-        android:inputType="textEmailAddress"
+        android:textColor="@color/black"
+        android:hint="Student ID"
+        android:inputType="text"
         android:padding="12dp" />
 
     <EditText
@@ -30,6 +31,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="25dp"
         android:background="@android:drawable/edit_text"
+        android:textColor="@color/black"
         android:hint="@string/password"
         android:inputType="textPassword"
         android:padding="12dp" />

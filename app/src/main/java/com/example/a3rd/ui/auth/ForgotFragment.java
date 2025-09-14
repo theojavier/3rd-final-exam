@@ -12,50 +12,67 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 
 import com.example.a3rd.R;
-import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 public class ForgotFragment extends Fragment {
 
-    private EditText etEmail;
-    private Button btnSend;
+    private EditText etStudentId, etEmail;
+    private Button btnVerify;
 
-    private FirebaseAuth mAuth;
+    private FirebaseFirestore db;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.forget, container, false);
 
+        // Inputs
+        etStudentId = root.findViewById(R.id.forgetStudentId);
         etEmail = root.findViewById(R.id.forgetEmail);
-        btnSend = root.findViewById(R.id.btnSendReset);
+        btnVerify = root.findViewById(R.id.btnVerify);
 
-        mAuth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
-        btnSend.setOnClickListener(v -> {
+        btnVerify.setOnClickListener(v -> {
+            String studentId = etStudentId.getText().toString().trim();
             String email = etEmail.getText().toString().trim();
 
+            if (TextUtils.isEmpty(studentId)) {
+                etStudentId.setError("Student ID required");
+                return;
+            }
             if (TextUtils.isEmpty(email)) {
                 etEmail.setError("Email required");
                 return;
             }
 
-            mAuth.sendPasswordResetEmail(email)
-                    .addOnCompleteListener(task -> {
-                        if (task.isSuccessful()) {
-                            if (getActivity() != null) {
-                                Toast.makeText(getActivity(),
-                                        "Password reset email sent. Check your inbox.",
-                                        Toast.LENGTH_LONG).show();
-                            }
+            // 🔍 Check Firestore for both StudentID + Email
+            db.collection("users")
+                    .whereEqualTo("studentId", studentId)
+                    .whereEqualTo("email", email)
+                    .limit(1)
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        if (!querySnapshot.isEmpty()) {
+                            DocumentSnapshot document = querySnapshot.getDocuments().get(0);
+                            String userId = document.getId();
+
+                            // ✅ Pass userId to ResetPasswordFragment
+                            Bundle bundle = new Bundle();
+                            bundle.putString("userId", userId);
+
+                            Toast.makeText(getActivity(), "Verified! Now set your new password.", Toast.LENGTH_SHORT).show();
+                            Navigation.findNavController(v).navigate(R.id.nav_reset_password, bundle);
                         } else {
-                            if (getActivity() != null) {
-                                Toast.makeText(getActivity(),
-                                        "Failed: " + task.getException().getMessage(),
-                                        Toast.LENGTH_LONG).show();
-                            }
-                            Log.e("ForgotFragment", "Password reset failed", task.getException());
+                            Toast.makeText(getActivity(), "No account found for this Student ID and Email", Toast.LENGTH_LONG).show();
                         }
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(getActivity(), "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        Log.e("ForgotFragment", "Firestore error", e);
                     });
         });
 
