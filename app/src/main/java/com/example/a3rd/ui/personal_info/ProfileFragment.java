@@ -69,7 +69,7 @@ public class ProfileFragment extends Fragment {
                         labelGender.setText("Gender: " + doc.getString("gender"));
 
                         // dob vs ddb check
-                        String dob = doc.contains("dob") ? doc.getString("dob") : doc.getString("ddb");
+                        String dob = doc.getString("dob");
                         labelDob.setText("Date of Birth: " + (dob != null ? dob : "N/A"));
 
                         labelCivil.setText("Civil Status: " + doc.getString("civilStatus"));

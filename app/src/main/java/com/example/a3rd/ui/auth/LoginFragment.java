@@ -75,6 +75,12 @@ public class LoginFragment extends Fragment {
                                     // Save Firestore userId in SharedPreferences
                                     SharedPreferences prefs = requireContext().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
                                     prefs.edit().putString("userId", document.getId()).apply();
+                                    getActivity().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE)
+                                            .edit()
+                                            .putString("userId", document.getId())   // Firestore document ID
+                                            .putString("studentId", studentId)       // Student’s own ID
+                                            .apply();
+
 
                                     Toast.makeText(getActivity(), "Welcome Student!", Toast.LENGTH_SHORT).show();
                                     Navigation.findNavController(v).navigate(R.id.nav_home);

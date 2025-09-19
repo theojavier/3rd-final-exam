@@ -1,6 +1,7 @@
 package com.example.a3rd.adapters;
 
 import android.content.Context;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,8 +12,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.a3rd.R;
 import com.example.a3rd.models.ExamModel;
+import com.example.a3rd.ui.exam.TakeExamFragment;
 
 import java.util.List;
+
 
 public class ExamAdapter extends RecyclerView.Adapter<ExamAdapter.ExamViewHolder> {
 
@@ -36,16 +39,25 @@ public class ExamAdapter extends RecyclerView.Adapter<ExamAdapter.ExamViewHolder
         ExamModel exam = examList.get(position);
 
         holder.tvSubject.setText(exam.getSubject());
-        holder.tvLoginTime.setText("LOGIN TIME: " + exam.getLoginTime());
-        holder.tvPosted.setText("Posted " + exam.getPostedDate());
+        holder.tvLoginTime.setText("LOGIN TIME: " + exam.getFormattedLoginTime());
+        holder.tvPosted.setText("Posted " + exam.getFormattedPostedDate());
 
-        // Show DONE only if exam is completed
-        if (exam.isDone()) {
+        if ("Complete".equalsIgnoreCase(exam.getStatus())) {
             holder.tvStatus.setVisibility(View.VISIBLE);
-            holder.tvStatus.setText("✔ DONE");
+            holder.tvStatus.setText("✔ Complete");
         } else {
             holder.tvStatus.setVisibility(View.GONE);
         }
+
+        // 👉 When user clicks, go to TakeExamActivity
+        holder.itemView.setOnClickListener(v -> {
+            Intent intent = new Intent(context, TakeExamFragment.class);
+            intent.putExtra("subject", exam.getSubject());
+            intent.putExtra("teacherId", exam.getTeacherId());
+            intent.putExtra("startTime", exam.getStartTime().toDate().getTime());
+            intent.putExtra("endTime", exam.getEndTime().toDate().getTime());
+            context.startActivity(intent);
+        });
     }
 
     @Override

@@ -24,7 +24,7 @@
         tools:layout="@layout/fragment_profile" />
     <fragment
         android:id="@+id/nav_exam_item_page"
-        android:name="com.example.a3rd.ui.exam.ExamFragment"
+        android:name="com.example.a3rd.ui.exam.Exam_item_Fragment"
         android:label="Profile"
         tools:layout="@layout/exam_layout" />
 
@@ -63,5 +63,24 @@
         android:name="com.example.a3rd.ui.auth.ResetPasswordFragment"
         android:label="Forgot Password"
         tools:layout="@layout/reset_password" />
+    <!-- Exam Fragment -->
+    <fragment
+        android:id="@+id/examFragment"
+        android:name="com.example.a3rd.ui.exam.ExamFragment"
+        android:label="Exam"
+        tools:layout="@layout/exam">
+
+        <!-- 👇 Action: go to Result Fragment -->
+        <action
+            android:id="@+id/action_examFragment_to_examResultFragment"
+            app:destination="@id/examResultFragment" />
+    </fragment>
+
+    <!-- Exam Result Fragment -->
+    <fragment
+        android:id="@+id/examResultFragment"
+        android:name="com.example.a3rd.ui.exam.ExamResultFragment"
+        android:label="Exam Result"
+        tools:layout="@layout/fragment_exam_result" />
 
 </navigation>

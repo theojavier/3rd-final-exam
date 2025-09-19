@@ -16,11 +16,6 @@
         app:showAsAction="always">
         <menu>
             <item
-                android:id="@+id/action_profile"
-                android:title="Profile"
-                android:icon="@drawable/ic_person"
-                app:showAsAction="always" />
-            <item
                 android:id="@+id/action_logout"
                 android:title="Logout"
                 android:icon="@drawable/ic_logout" />

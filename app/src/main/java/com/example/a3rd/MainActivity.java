@@ -1,9 +1,7 @@
 package com.example.a3rd;
 
-import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -12,12 +10,9 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
@@ -25,20 +20,18 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.request.target.CustomTarget;
-import com.bumptech.glide.request.transition.Transition;
 import com.example.a3rd.databinding.ActivityMainBinding;
 import com.google.android.material.navigation.NavigationView;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-public class MainActivity extends AppCompatActivity  {
+import java.lang.reflect.Method;
+
+public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
     private DrawerLayout drawer;
-
-
+    private String profileImageUrl; // still used for nav header
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,12 +42,12 @@ public class MainActivity extends AppCompatActivity  {
         setSupportActionBar(binding.appBarMain.toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
-        DrawerLayout drawer = binding.drawerLayout;
+        drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
 
-        // Set top-level destinations
+        // Top-level destinations
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_myschedule,R.id.nav_exam_item_page)
+                R.id.nav_home, R.id.nav_myschedule, R.id.nav_exam_item_page)
                 .setOpenableLayout(drawer)
                 .build();
 
@@ -65,10 +58,9 @@ public class MainActivity extends AppCompatActivity  {
         // 🔹 Click logo → navigate Home
         ImageView logo = findViewById(R.id.toolbar_logo);
         logo.setOnClickListener(v -> {
-            navController.popBackStack(R.id.nav_home, false); // clears backstack to Home
+            navController.popBackStack(R.id.nav_home, false);
             navController.navigate(R.id.nav_home);
         });
-
 
         // Hide toolbar & drawer for login/forgot fragments
         navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
@@ -82,9 +74,8 @@ public class MainActivity extends AppCompatActivity  {
             }
         });
 
-        // 🔽 Header Views
+        // 🔽 Get Header View (first header of navView)
         View headerView = navigationView.getHeaderView(0);
-
         LinearLayout headerTop = headerView.findViewById(R.id.nav_header_top);
         ImageView arrow = headerView.findViewById(R.id.nav_header_arrow);
         LinearLayout dropdown = headerView.findViewById(R.id.nav_header_dropdown);
@@ -112,49 +103,69 @@ public class MainActivity extends AppCompatActivity  {
             navController.navigate(R.id.nav_exam_history);
         });
 
-        // 🔽 Load user data from Firestore
+        // 🔽 Load user data from Firestore (like ProfileFragment)
         FirebaseFirestore db = FirebaseFirestore.getInstance();
-        FirebaseAuth auth = FirebaseAuth.getInstance();
+        SharedPreferences prefs = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+        String userId = prefs.getString("userId", null);
 
-        if (auth.getCurrentUser() != null) {
-            String userId = auth.getCurrentUser().getUid();
-
-            db.collection("users").document(userId).get().addOnSuccessListener(doc -> {
-                if (doc.exists()) {
-                    String name = doc.getString("name");
-                    String section = doc.getString("section");
-                    String imageUrl = doc.getString("profileImage");
-
-                    headerName.setText(name != null ? name : "No Name");
-                    headerSection.setText(section != null ? section : "No Section");
-
-                    if (imageUrl != null && !imageUrl.isEmpty()) {
-                        Glide.with(this)
-                                .load(imageUrl)
-                                .placeholder(R.drawable.ic_person)
-                                .into(headerImage);
-                    } else {
-                        headerImage.setImageResource(R.drawable.ic_person);
-                    }
-                }
-            });
+        if (userId == null) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        db.collection("users").document(userId)
+                .addSnapshotListener((doc, error) -> {
+                    if (error != null) {
+                        Toast.makeText(this, "Error loading profile", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (doc != null && doc.exists()) {
+                        String name = doc.getString("name");
+                        String program = doc.getString("program");
+                        String yearBlock = doc.getString("yearBlock");
+                        String semester = doc.getString("semester");
+                        profileImageUrl = doc.getString("profileImage");
+
+                        headerName.setText(name != null ? name : "No Name");
+
+                        // Combine program + yearBlock + semester into section
+                        String sectionText = "";
+                        if (program != null) sectionText += program + " ";
+                        if (yearBlock != null) sectionText += yearBlock + " ";
+                        if (semester != null) sectionText += "(" + semester + ")";
+                        headerSection.setText(!sectionText.trim().isEmpty() ? sectionText : "No Section");
+
+                        if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
+                            if (profileImageUrl.contains("imgur.com") && !profileImageUrl.contains("i.imgur.com")) {
+                                profileImageUrl = profileImageUrl.replace("imgur.com", "i.imgur.com") + ".jpg";
+                            }
+
+                            Glide.with(this)
+                                    .load(profileImageUrl)
+                                    .circleCrop()
+                                    .placeholder(R.drawable.ic_person)
+                                    .error(R.drawable.ic_person)
+                                    .into(headerImage);
+                        } else {
+                            headerImage.setImageResource(R.drawable.ic_person);
+                        }
+                    }
+                });
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main, menu);
 
-        // -----------------------------
-        // 1. Notifications Badge
-        // -----------------------------
+        // 🔹 Notifications Badge
         MenuItem notificationItem = menu.findItem(R.id.action_notifications);
         notificationItem.setActionView(R.layout.notification_badge);
 
         View actionView = notificationItem.getActionView();
         TextView badgeTextView = actionView.findViewById(R.id.notification_badge);
 
-        int notificationCount = 0; // Example value, replace with your actual count
+        int notificationCount = 0; // Replace with your actual count
         if (notificationCount > 0) {
             badgeTextView.setText(String.valueOf(notificationCount));
             badgeTextView.setVisibility(View.VISIBLE);
@@ -162,30 +173,25 @@ public class MainActivity extends AppCompatActivity  {
             badgeTextView.setVisibility(View.GONE);
         }
 
-        // -----------------------------
-        // 2. Profile Picture in Toolbar
-        // -----------------------------
-        MenuItem profileItem = menu.findItem(R.id.action_profile);
-
-        // Example: get the photo URL (same as Profile screen)
-        String photoUrl = "https://example.com/student_profile.jpg";
-
-        Glide.with(this)
-                .asBitmap()
-                .load(photoUrl)
-                .circleCrop()
-                .into(new CustomTarget<Bitmap>(96, 96) { // make smaller if needed
-                    @Override
-                    public void onResourceReady(@NonNull Bitmap resource,
-                                                @Nullable Transition<? super Bitmap> transition) {
-                        profileItem.setIcon(new BitmapDrawable(getResources(), resource));
-                    }
-
-                    @Override
-                    public void onLoadCleared(@Nullable Drawable placeholder) { }
-                });
-
         return true;
+    }
+
+    // 🔹 Force icons to show in overflow menu
+    @Override
+    public boolean onMenuOpened(int featureId, Menu menu) {
+        if (menu != null) {
+            if (menu.getClass().getSimpleName().equalsIgnoreCase("MenuBuilder")) {
+                try {
+                    Method m = menu.getClass().getDeclaredMethod(
+                            "setOptionalIconsVisible", Boolean.TYPE);
+                    m.setAccessible(true);
+                    m.invoke(menu, true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return super.onMenuOpened(featureId, menu);
     }
 
     @Override
@@ -199,9 +205,8 @@ public class MainActivity extends AppCompatActivity  {
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.action_profile) {
-            return true;
-        } else if (id == R.id.action_notifications) {
+        if (id == R.id.action_notifications) {
+            Toast.makeText(this, "Notifications clicked", Toast.LENGTH_SHORT).show();
             return true;
         } else if (id == R.id.action_logout) {
             finishAffinity();
@@ -211,6 +216,4 @@ public class MainActivity extends AppCompatActivity  {
 
         return super.onOptionsItemSelected(item);
     }
-
-
 }

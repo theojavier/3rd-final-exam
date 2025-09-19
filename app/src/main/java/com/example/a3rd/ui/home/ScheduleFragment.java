@@ -9,14 +9,15 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.a3rd.R;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -27,19 +28,21 @@ public class ScheduleFragment extends Fragment {
     private TableLayout tableLayout;
     private FirebaseFirestore firestore;
 
-    // 🔹 Match the hours you put in XML (7AM – 7PM)
+    // 🔹 Match your XML hours (7AM – 7PM)
     private final String[] timeSlots = {
             "7:00 – 8:00 AM", "8:00 – 9:00 AM", "9:00 – 10:00 AM", "10:00 – 11:00 AM",
             "11:00 – 12:00 PM", "12:00 – 1:00 PM", "1:00 – 2:00 PM", "2:00 – 3:00 PM",
             "3:00 – 4:00 PM", "4:00 – 5:00 PM", "5:00 – 6:00 PM", "6:00 – 7:00 PM"
     };
 
+    private final SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm a", Locale.getDefault());
+
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.activity_schedule, container, false);
 
-        tableLayout = view.findViewById(R.id.schedule_table); // 👈 set id in XML for TableLayout
+        tableLayout = view.findViewById(R.id.schedule_table);
         firestore = FirebaseFirestore.getInstance();
 
         loadExamsForWeek();
@@ -48,19 +51,22 @@ public class ScheduleFragment extends Fragment {
     }
 
     private void loadExamsForWeek() {
-        // Example Firestore collection: "exams"
         firestore.collection("exams")
                 .get()
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful() && task.getResult() != null) {
                         for (DocumentSnapshot doc : task.getResult()) {
                             String subject = doc.getString("subject");
-                            String day = doc.getString("day"); // e.g., "Mon", "Tue"
-                            String startTime = doc.getString("startTime"); // e.g., "07:00"
-                            String endTime = doc.getString("endTime");     // e.g., "09:00"
+                            Timestamp startTS = doc.getTimestamp("startTime");
+                            Timestamp endTS = doc.getTimestamp("endTime");
 
-                            if (subject != null && day != null && startTime != null && endTime != null) {
-                                placeExamOnSchedule(subject, day, startTime, endTime);
+                            if (subject != null && startTS != null && endTS != null) {
+                                Date startDate = startTS.toDate();
+                                Date endDate = endTS.toDate();
+
+                                if (isInCurrentWeek(startDate)) {
+                                    placeExamOnSchedule(subject, startDate, endDate);
+                                }
                             }
                         }
                     } else {
@@ -69,65 +75,74 @@ public class ScheduleFragment extends Fragment {
                 });
     }
 
-    private void placeExamOnSchedule(String subject, String day, String start, String end) {
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        try {
-            Date startTime = sdf.parse(start);
-            Date endTime = sdf.parse(end);
+    // 🔹 Check if date belongs to this week (Mon–Sun)
+    private boolean isInCurrentWeek(Date date) {
+        Calendar cal = Calendar.getInstance();
+        // Reset time part
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
 
-            Calendar cal = Calendar.getInstance();
-            cal.setTime(startTime);
-            int startHour = cal.get(Calendar.HOUR_OF_DAY);
+        // Start of week (Monday)
+        cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        Date weekStart = cal.getTime();
 
-            cal.setTime(endTime);
-            int endHour = cal.get(Calendar.HOUR_OF_DAY);
+        // End of week (Sunday)
+        cal.add(Calendar.DAY_OF_WEEK, 6);
+        Date weekEnd = cal.getTime();
 
-            // 🔹 Example: 7:00–9:00 → fills 7–8 and 8–9
-            for (int hour = startHour; hour < endHour; hour++) {
-                fillSlot(hour, day, subject);
-            }
+        return !date.before(weekStart) && !date.after(weekEnd);
+    }
 
-        } catch (ParseException e) {
-            e.printStackTrace();
+    private void placeExamOnSchedule(String subject, Date start, Date end) {
+        Calendar cal = Calendar.getInstance();
+
+        // Get day of week (Mon=1 … Sun=7 for our table)
+        cal.setTime(start);
+        int dayOfWeek = cal.get(Calendar.DAY_OF_WEEK);
+        int colIndex;
+        switch (dayOfWeek) {
+            case Calendar.MONDAY: colIndex = 1; break;
+            case Calendar.TUESDAY: colIndex = 2; break;
+            case Calendar.WEDNESDAY: colIndex = 3; break;
+            case Calendar.THURSDAY: colIndex = 4; break;
+            case Calendar.FRIDAY: colIndex = 5; break;
+            case Calendar.SATURDAY: colIndex = 6; break;
+            case Calendar.SUNDAY: colIndex = 7; break;
+            default: colIndex = -1;
+        }
+
+        if (colIndex == -1) return;
+
+        // Hours
+        Calendar startCal = Calendar.getInstance();
+        startCal.setTime(start);
+        int startHour = startCal.get(Calendar.HOUR_OF_DAY);
+
+        Calendar endCal = Calendar.getInstance();
+        endCal.setTime(end);
+        int endHour = endCal.get(Calendar.HOUR_OF_DAY);
+
+        String timeRange = timeFormat.format(start) + " – " + timeFormat.format(end);
+
+        // Example: 7–9 → fill 7–8 and 8–9
+        for (int hour = startHour; hour < endHour; hour++) {
+            fillSlot(hour, colIndex, subject, timeRange);
         }
     }
 
-    private void fillSlot(int hour, String day, String subject) {
-        // Map day string → column index (0 = Time, 1 = Mon, 2 = Tue, etc.)
-        int colIndex = -1;
-        switch (day) {
-            case "Mon":
-                colIndex = 1;
-                break;
-            case "Tue":
-                colIndex = 2;
-                break;
-            case "Wed":
-                colIndex = 3;
-                break;
-            case "Thu":
-                colIndex = 4;
-                break;
-            case "Fri":
-                colIndex = 5;
-                break;
-            case "Sat":
-                colIndex = 6;
-                break;
-            case "Sun":
-                colIndex = 7;
-                break;
-        }
+    private void fillSlot(int hour, int colIndex, String subject, String timeRange) {
+        // Find row by hour (7AM=Row1, 8AM=Row2, etc.)
+        int rowIndex = hour - 7 + 1; // +1 because row0 = header
 
-        if (colIndex == -1) return; // invalid day, do nothing
+        if (rowIndex < 1 || rowIndex >= tableLayout.getChildCount()) return;
 
-        // Now find the correct row by `hour`
-        TableRow row = (TableRow) tableLayout.getChildAt(hour - 7 + 1);
-        // +1 because row 0 is header
+        TableRow row = (TableRow) tableLayout.getChildAt(rowIndex);
 
         if (row != null && row.getChildCount() > colIndex) {
             TextView cell = (TextView) row.getChildAt(colIndex);
-            cell.setText(subject);
+            cell.setText(subject + "\n" + timeRange);
             cell.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.teal_200));
             cell.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black));
         }
