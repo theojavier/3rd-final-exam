@@ -17,6 +17,7 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 
+import com.example.a3rd.MainActivity;
 import com.example.a3rd.R;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -33,7 +34,6 @@ public class LoginFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.login, container, false);
 
-        // Firestore only (no FirebaseAuth since we’re using studentId + password)
         db = FirebaseFirestore.getInstance();
 
         // Views
@@ -69,26 +69,25 @@ public class LoginFragment extends Fragment {
                             String role = document.getString("role");
 
                             if (storedPassword != null && storedPassword.equals(password)) {
-                                // ✅ Correct StudentID + Password
                                 if ("student".equalsIgnoreCase(role)) {
-
-                                    // Save Firestore userId in SharedPreferences
+                                    // ✅ Save new session, overwrite old one
                                     SharedPreferences prefs = requireContext().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
-                                    prefs.edit().putString("userId", document.getId()).apply();
-                                    getActivity().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE)
-                                            .edit()
+                                    prefs.edit()
+                                            .clear() // wipe old session
                                             .putString("userId", document.getId())   // Firestore document ID
                                             .putString("studentId", studentId)       // Student’s own ID
+                                            .putBoolean("isLoggedIn", true)          // logged in flag
                                             .apply();
 
-
                                     Toast.makeText(getActivity(), "Welcome Student!", Toast.LENGTH_SHORT).show();
+                                    if (getActivity() instanceof MainActivity) {
+                                        ((MainActivity) getActivity()).loadUserProfile();
+                                    }
                                     Navigation.findNavController(v).navigate(R.id.nav_home);
                                 } else {
                                     Toast.makeText(getActivity(), "Access denied (not a student)", Toast.LENGTH_LONG).show();
                                 }
                             } else {
-                                // ❌ Wrong password
                                 Toast.makeText(getActivity(), "Invalid Student ID or Password", Toast.LENGTH_LONG).show();
                             }
 
@@ -102,7 +101,7 @@ public class LoginFragment extends Fragment {
                     });
         });
 
-        // Forgot password → navigate to ForgotFragment
+        // Forgot password
         tvForgot.setOnClickListener(v ->
                 Navigation.findNavController(v).navigate(R.id.nav_forgot));
 
