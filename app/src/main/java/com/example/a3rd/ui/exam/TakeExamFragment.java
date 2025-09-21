@@ -37,8 +37,7 @@ public class TakeExamFragment extends Fragment {
     private long startMillis = -1;
     private long endMillis = -1;
 
-    public TakeExamFragment() {
-    }
+    public TakeExamFragment() {}
 
     @Nullable
     @Override
@@ -55,7 +54,7 @@ public class TakeExamFragment extends Fragment {
 
         db = FirebaseFirestore.getInstance();
 
-        // ✅ Load studentId
+        // ✅ Load studentId from SharedPreferences
         SharedPreferences prefs = requireContext().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
         studentId = prefs.getString("studentId", null);
 
@@ -65,7 +64,7 @@ public class TakeExamFragment extends Fragment {
             return view;
         }
 
-        // ✅ Get examId + start/end from arguments
+        // ✅ Get examId and schedule from arguments
         Bundle args = getArguments();
         if (args == null) {
             Toast.makeText(getContext(), "No arguments passed", Toast.LENGTH_SHORT).show();
@@ -81,7 +80,7 @@ public class TakeExamFragment extends Fragment {
             return view;
         }
 
-        // 🔹 Fetch exam details from Firestore
+        // 🔹 Fetch exam details
         db.collection("exams").document(examId).get()
                 .addOnSuccessListener(doc -> {
                     if (!doc.exists()) {
@@ -94,7 +93,6 @@ public class TakeExamFragment extends Fragment {
                     Timestamp startTimestamp = doc.getTimestamp("startTime");
                     Timestamp endTimestamp = doc.getTimestamp("endTime");
 
-                    // ✅ Prefer arguments first, fallback to Firestore
                     if (startMillis == -1 && startTimestamp != null) {
                         startMillis = startTimestamp.toDate().getTime();
                     }
@@ -123,55 +121,84 @@ public class TakeExamFragment extends Fragment {
                                 .addOnFailureListener(e -> tvTeacher.setText("Teacher: Unknown"));
                     }
 
-                    // 🔹 Check examResults
+                    // ✅ Compute exam status from current time
+                    long now = System.currentTimeMillis();
+                    String examStatus;
+                    if (now < startMillis) {
+                        examStatus = "upcoming";
+                    } else if (now > endMillis) {
+                        examStatus = "ended";
+                    } else {
+                        examStatus = "ongoing";
+                    }
+
+                    // ✅ Correct Firestore path for results
                     DocumentReference resultRef = db.collection("examResults")
-                            .document(examId + "_" + studentId);
+                            .document(examId)
+                            .collection(studentId)
+                            .document("result");
 
                     resultRef.get().addOnSuccessListener(snapshot -> {
-                        long now = System.currentTimeMillis();
-                        long s = startMillis > 0 ? startMillis : 0;
-                        long e = endMillis > 0 ? endMillis : 0;
-
                         if (snapshot.exists()) {
-                            String status = snapshot.getString("status");
-                            if ("complete".equals(status)) {
+                            String studentStatus = snapshot.getString("status");
+
+                            if ("completed".equals(studentStatus)) {
+                                // Exam already finished → only allow viewing result
                                 btnStartExam.setText("View Result");
                                 btnStartExam.setOnClickListener(v -> {
                                     Bundle bundle = new Bundle();
                                     bundle.putInt("score", snapshot.getLong("score").intValue());
                                     bundle.putInt("total", snapshot.getLong("total").intValue());
-                                    bundle.putSerializable("answers", new HashMap<>(snapshot.getData()));
+                                    bundle.putString("examId", examId);
+                                    bundle.putString("studentId", studentId);
                                     Navigation.findNavController(v).navigate(R.id.examResultFragment, bundle);
                                 });
-                            } else if ("in-progress".equals(status)) {
-                                btnStartExam.setEnabled(false);
-                                btnStartExam.setText("Already in progress");
-                            }
-                        } else {
-                            if (now < s) {
-                                btnStartExam.setEnabled(false);
-                                btnStartExam.setText("Exam not started yet");
-                            } else if (now > e) {
-                                btnStartExam.setEnabled(false);
-                                btnStartExam.setText("Exam ended");
-                            } else {
+
+                            } else if ("in-progress".equals(studentStatus)) {
+                                // Exam started but not submitted → allow resume
                                 btnStartExam.setEnabled(true);
-                                btnStartExam.setText("Start Exam");
+                                btnStartExam.setText("Resume Exam");
                                 btnStartExam.setOnClickListener(v -> {
-                                    Toast.makeText(getContext(), "Exam Started!", Toast.LENGTH_SHORT).show();
-
-                                    Map<String, Object> resultData = new HashMap<>();
-                                    resultData.put("examId", examId);
-                                    resultData.put("studentId", studentId);
-                                    resultData.put("status", "in-progress");
-                                    resultData.put("timestamp", System.currentTimeMillis());
-
-                                    resultRef.set(resultData);
-
                                     Bundle bundle = new Bundle();
                                     bundle.putString("examId", examId);
+                                    bundle.putString("studentId", studentId);
                                     Navigation.findNavController(v).navigate(R.id.examFragment, bundle);
                                 });
+                            }
+
+                        } else {
+                            // No record yet → use exam status
+                            switch (examStatus) {
+                                case "upcoming":
+                                    btnStartExam.setEnabled(false);
+                                    btnStartExam.setText("Exam not started yet");
+                                    break;
+
+                                case "ended":
+                                    btnStartExam.setEnabled(false);
+                                    btnStartExam.setText("Exam ended");
+                                    break;
+
+                                case "ongoing":
+                                    btnStartExam.setEnabled(true);
+                                    btnStartExam.setText("Start Exam");
+                                    btnStartExam.setOnClickListener(v -> {
+                                        Toast.makeText(getContext(), "Exam Started!", Toast.LENGTH_SHORT).show();
+
+                                        Map<String, Object> resultData = new HashMap<>();
+                                        resultData.put("examId", examId);
+                                        resultData.put("studentId", studentId);
+                                        resultData.put("status", "in-progress");
+                                        resultData.put("timestamp", now);
+
+                                        resultRef.set(resultData);
+
+                                        Bundle bundle = new Bundle();
+                                        bundle.putString("examId", examId);
+                                        bundle.putString("studentId", studentId);
+                                        Navigation.findNavController(v).navigate(R.id.examFragment, bundle);
+                                    });
+                                    break;
                             }
                         }
                     });
@@ -189,9 +216,8 @@ public class TakeExamFragment extends Fragment {
                 new OnBackPressedCallback(true) {
                     @Override
                     public void handleOnBackPressed() {
-                        // ✅ Always go back to My Exam
                         Navigation.findNavController(requireView())
-                                .navigate(R.id.nav_exam_item_page);
+                                .navigate(R.id.action_nav_home_to_nav_exam_item_page);
                     }
                 }
         );

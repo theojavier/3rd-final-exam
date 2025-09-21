@@ -11,6 +11,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -60,13 +61,8 @@ public class ExamHistoryFragment extends Fragment {
             Bundle bundle = new Bundle();
             bundle.putString("examId", examId);
 
-            ExamResultFragment fragment = new ExamResultFragment();
-            fragment.setArguments(bundle);
-
-            requireActivity().getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.nav_host_fragment_content_main, fragment)
-                    .addToBackStack(null)
-                    .commit();
+            Navigation.findNavController(requireView())
+                    .navigate(R.id.examResultFragment, bundle);
         });
 
         return view;
@@ -78,7 +74,7 @@ public class ExamHistoryFragment extends Fragment {
             return;
         }
 
-        firestore.collection("examHistory")
+        firestore.collection("examResults")
                 .whereEqualTo("studentId", currentStudentId) // ✅ filter by logged-in student
                 .get()
                 .addOnCompleteListener(task -> {
@@ -86,11 +82,21 @@ public class ExamHistoryFragment extends Fragment {
                         historyList.clear();
                         for (DocumentSnapshot doc : task.getResult()) {
                             String examId = doc.getString("examId");
-                            String subject = doc.getString("subject");
-                            String date = doc.getString("date");
-                            String score = doc.getString("score");
+                            String score = String.valueOf(doc.getLong("score"));
+                            String total = String.valueOf(doc.getLong("total"));
+                            String status = doc.getString("status");
 
-                            historyList.add(new ExamHistory(examId, subject, date, score));
+                            // optional: format date from submittedAt
+                            long timestamp = doc.contains("submittedAt")
+                                    ? doc.getLong("submittedAt")
+                                    : 0;
+                            String date = (timestamp > 0)
+                                    ? new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",
+                                    java.util.Locale.getDefault()).format(new java.util.Date(timestamp))
+                                    : "N/A";
+
+                            // 🔹 Subject isn’t in your schema → set examId as subject placeholder
+                            historyList.add(new ExamHistory(examId, examId, date, score + "/" + total));
                         }
                         adapter.notifyDataSetChanged();
                     } else {

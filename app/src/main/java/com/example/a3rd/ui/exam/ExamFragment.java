@@ -17,7 +17,9 @@ import androidx.navigation.Navigation;
 
 import com.example.a3rd.R;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.*;
@@ -39,14 +41,15 @@ public class ExamFragment extends Fragment {
     private int score = 0;
 
     private String examId;
-    private String studentId; // fixed: load at start
+    private String studentId;
 
-    public ExamFragment() {
-    }
+    public ExamFragment() { }
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.exam, container, false);
 
         // Views
@@ -210,7 +213,7 @@ public class ExamFragment extends Fragment {
             List<String> pool = new ArrayList<>(matchingPool);
             if (pool.isEmpty() && q.options != null) pool.addAll(q.options);
 
-            Collections.shuffle(pool); // ✅ randomize every time
+            Collections.shuffle(pool);
 
             ArrayAdapter<String> adapter = new ArrayAdapter<>(
                     requireContext(),
@@ -229,6 +232,9 @@ public class ExamFragment extends Fragment {
     private void saveAnswer(QuestionModel q) {
         if (q == null) return;
 
+        // Capture the current index immediately to avoid race conditions with async callbacks
+        final int qIndex = currentQuestionIndex;
+
         String answer = null;
 
         if ("multiple-choice".equalsIgnoreCase(q.type)) {
@@ -237,21 +243,28 @@ public class ExamFragment extends Fragment {
                 RadioButton rb = radioGroupOptions.findViewById(selectedId);
                 if (rb != null) answer = rb.getText().toString();
             }
+
         } else if ("true-false".equalsIgnoreCase(q.type)) {
             int selectedId = radioGroupTrueFalse.getCheckedRadioButtonId();
             if (selectedId != -1) {
                 RadioButton rb = radioGroupTrueFalse.findViewById(selectedId);
                 if (rb != null) answer = rb.getText().toString();
             }
+
         } else if ("matching".equalsIgnoreCase(q.type)) {
+            // Ensure spinner has a selection (defensive)
+            if (spinnerMatching.getSelectedItemPosition() < 0 && spinnerMatching.getAdapter() != null && spinnerMatching.getAdapter().getCount() > 0) {
+                spinnerMatching.setSelection(0);
+            }
             Object sel = spinnerMatching.getSelectedItem();
             if (sel != null) answer = sel.toString();
         }
 
-        String key = q.questionText != null ? q.questionText : "q" + currentQuestionIndex;
+        // Build a stable key using the captured index to avoid duplicate keys if two questions have the same text
+        String key = (q.questionText != null ? q.questionText : "q" + qIndex) + " (q" + qIndex + ")";
         studentAnswers.put(key, answer != null ? answer : "");
 
-        // auto-score
+        // Auto-score
         if (answer != null && q.correctAnswer != null) {
             if (q.correctAnswer instanceof List) {
                 if (((List<?>) q.correctAnswer).contains(answer)) score++;
@@ -260,22 +273,41 @@ public class ExamFragment extends Fragment {
             }
         }
 
-        // ✅ auto-save to Firestore subcollection
+        // Auto-save into nested structure (examId / studentId / result / answers / qX)
         if (examId != null && studentId != null) {
-            String docId = examId + "_" + studentId;
-
+            final String answerDocId = "q" + qIndex;            // use captured index
             Map<String, Object> answerData = new HashMap<>();
             answerData.put("question", q.questionText);
             answerData.put("answer", answer != null ? answer : "");
+            answerData.put("index", qIndex);
             answerData.put("timestamp", System.currentTimeMillis());
 
-            db.collection("examResults")
-                    .document(docId)
-                    .collection("answers")
-                    .document("q" + currentQuestionIndex)
-                    .set(answerData)
-                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Auto-saved q" + currentQuestionIndex))
-                    .addOnFailureListener(e -> Log.w(TAG, "Auto-save failed", e));
+            // Document reference for the student's "result"
+            DocumentReference resultDocRef = db.collection("examResults")
+                    .document(examId)          // exam parent
+                    .collection(studentId)     // student subcollection
+                    .document("result");       // result doc
+
+            // Ensure result doc exists (set in-progress status without overwriting other fields)
+            Map<String, Object> inProgressUpdate = new HashMap<>();
+            inProgressUpdate.put("examId", examId);
+            inProgressUpdate.put("studentId", studentId);
+            inProgressUpdate.put("status", "in-progress");
+            inProgressUpdate.put("lastSavedAt", com.google.firebase.Timestamp.now());
+
+            // Use captured answerDocId inside callbacks so it's stable
+            resultDocRef.set(inProgressUpdate, com.google.firebase.firestore.SetOptions.merge())
+                    .addOnSuccessListener(aVoid -> {
+                        // now save the answer under answers subcollection using the captured id
+                        resultDocRef.collection("answers")
+                                .document(answerDocId)
+                                .set(answerData)
+                                .addOnSuccessListener(aVoid2 -> Log.d(TAG, "Auto-saved answer " + answerDocId + " (qIndex=" + qIndex + ")"))
+                                .addOnFailureListener(e -> Log.w(TAG, "Auto-save answer failed for " + answerDocId + " (qIndex=" + qIndex + ")", e));
+                    })
+                    .addOnFailureListener(e -> Log.w(TAG, "Ensure result doc failed for examId=" + examId + " studentId=" + studentId, e));
+        } else {
+            Log.w(TAG, "saveAnswer: examId or studentId null (examId=" + examId + ", studentId=" + studentId + ")");
         }
     }
 
@@ -297,25 +329,32 @@ public class ExamFragment extends Fragment {
     }
 
     private void submitExam(String examId, String studentId, int score, View view) {
-        String docId = examId + "_" + studentId;
+        if (examId == null || studentId == null) {
+            Toast.makeText(requireContext(), "Missing exam or student info", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("studentId", studentId);
         result.put("examId", examId);
         result.put("score", score);
         result.put("total", questionList.size());
-        result.put("status", "completed");
-        result.put("submittedAt", Timestamp.now()); // ✅ proper timestamp
+        result.put("status", "completed"); // ✅ mark finished
+        result.put("submittedAt", Timestamp.now());
 
+        // ✅ Save into the new path
         db.collection("examResults")
-                .document(docId)
+                .document(examId)
+                .collection(studentId)
+                .document("result")
                 .set(result)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(requireContext(), "Exam submitted!", Toast.LENGTH_SHORT).show();
 
+                    // Pass data to ExamResultFragment
                     Bundle bundle = new Bundle();
-                    bundle.putString("examId", examId);     // ✅ added
-                    bundle.putString("studentId", studentId); // ✅ added
+                    bundle.putString("examId", examId);
+                    bundle.putString("studentId", studentId);
                     bundle.putInt("score", score);
                     bundle.putInt("total", questionList.size());
                     bundle.putSerializable("answers", new HashMap<>(studentAnswers));
@@ -329,7 +368,7 @@ public class ExamFragment extends Fragment {
                 });
     }
 
-    // Model
+    // simple question model
     public static class QuestionModel {
         public String questionText;
         public String type;
@@ -345,9 +384,7 @@ public class ExamFragment extends Fragment {
                 new OnBackPressedCallback(true) {
                     @Override
                     public void handleOnBackPressed() {
-                        // ✅ Always go back to My Exam
-                        Navigation.findNavController(requireView())
-                                .navigate(R.id.nav_exam_item_page);
+                        Navigation.findNavController(requireView()).navigate(R.id.nav_exam_item_page);
                     }
                 }
         );

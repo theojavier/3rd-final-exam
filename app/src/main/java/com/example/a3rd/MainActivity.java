@@ -56,10 +56,17 @@ public class MainActivity extends AppCompatActivity {
 
         // Top-level destinations
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_myschedule, R.id.nav_exam_item_page)
+                R.id.nav_home,
+                R.id.nav_myschedule,
+                R.id.nav_exam_item_page,
+                R.id.nav_profile,
+                R.id.nav_exam_history,
+                R.id.takeExamFragment,
+                R.id.examResultFragment,
+                R.id.examFragment
+        )
                 .setOpenableLayout(drawer)
                 .build();
-
         final NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
         NavigationUI.setupWithNavController(navigationView, navController);
