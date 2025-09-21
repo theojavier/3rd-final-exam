@@ -118,6 +118,27 @@ public class MainActivity extends AppCompatActivity {
 
         myProfile.setOnClickListener(v -> navController.navigate(R.id.nav_profile));
         history.setOnClickListener(v -> navController.navigate(R.id.nav_exam_history));
+        navigationView.setNavigationItemSelectedListener(item -> {
+            int id = item.getItemId();
+
+            if (id == R.id.nav_exam_item_page) {
+                navController.navigate(R.id.nav_exam_item_page);
+                drawer.closeDrawers();
+                return true;
+            } else if (id == R.id.nav_home) {
+                navController.navigate(R.id.nav_home);
+                drawer.closeDrawers();
+                return true;
+            } else if (id == R.id.nav_myschedule) {
+                navController.navigate(R.id.nav_myschedule);
+                drawer.closeDrawers();
+                return true;
+            }
+
+            // fallback → let NavigationUI handle other clicks
+            return NavigationUI.onNavDestinationSelected(item, navController)
+                    || super.onOptionsItemSelected(item);
+        });
 
         // initial load (single fetch)
         loadUserProfile();
@@ -284,4 +305,5 @@ public class MainActivity extends AppCompatActivity {
         navController.popBackStack(R.id.nav_home, true);
         navController.navigate(R.id.nav_login);
     }
+
 }

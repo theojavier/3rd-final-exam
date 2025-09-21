@@ -16,6 +16,16 @@ import java.util.List;
 public class ExamHistoryAdapter extends RecyclerView.Adapter<ExamHistoryAdapter.ViewHolder> {
 
     private final List<ExamHistory> historyList;
+    private OnItemClickListener listener;
+
+    // Listener interface
+    public interface OnItemClickListener {
+        void onItemClick(ExamHistory history, String examId);
+    }
+
+    public void setOnItemClickListener(OnItemClickListener listener) {
+        this.listener = listener;
+    }
 
     public ExamHistoryAdapter(List<ExamHistory> historyList) {
         this.historyList = historyList;
@@ -36,6 +46,12 @@ public class ExamHistoryAdapter extends RecyclerView.Adapter<ExamHistoryAdapter.
         holder.txtSubject.setText(history.getSubject());
         holder.txtDate.setText(history.getDate());
         holder.txtScore.setText(history.getScore());
+
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onItemClick(history, history.getExamId()); // 👈 pass examId too
+            }
+        });
     }
 
     @Override

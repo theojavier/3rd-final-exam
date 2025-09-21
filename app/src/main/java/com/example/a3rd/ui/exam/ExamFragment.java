@@ -9,18 +9,21 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 
 import com.example.a3rd.R;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.*;
 
 public class ExamFragment extends Fragment {
+    private static final String TAG = "ExamFragment";
 
     private TextView tvExamTitle, tvQuestion;
     private RadioGroup radioGroupOptions, radioGroupTrueFalse;
@@ -29,21 +32,24 @@ public class ExamFragment extends Fragment {
 
     private FirebaseFirestore db;
     private List<QuestionModel> questionList;
-    private List<String> matchingPool;
+    private Set<String> matchingPool;
+
     private int currentQuestionIndex = 0;
-
     private Map<String, Object> studentAnswers = new HashMap<>();
-    private int score = 0; // auto-scored as student answers questions
+    private int score = 0;
 
-    public ExamFragment() {}
+    private String examId;
+    private String studentId; // fixed: load at start
+
+    public ExamFragment() {
+    }
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.exam, container, false);
 
-        // Initialize views
+        // Views
         tvExamTitle = view.findViewById(R.id.tv_exam_title);
         tvQuestion = view.findViewById(R.id.tv_question);
         radioGroupOptions = view.findViewById(R.id.radio_group_options);
@@ -51,27 +57,55 @@ public class ExamFragment extends Fragment {
         spinnerMatching = view.findViewById(R.id.spinner_matching);
         btnNextQuestion = view.findViewById(R.id.btn_next_question);
 
+        btnNextQuestion.setEnabled(false);
+
         db = FirebaseFirestore.getInstance();
         questionList = new ArrayList<>();
-        matchingPool = new ArrayList<>();
+        matchingPool = new LinkedHashSet<>();
 
-        loadExamAndQuestions();
+        // examId from args or prefs
+        Bundle args = getArguments();
+        if (args != null && args.containsKey("examId")) {
+            examId = args.getString("examId");
+            Log.d(TAG, "examId from args = " + examId);
+        }
+        if (examId == null) {
+            Context ctx = getContext();
+            if (ctx != null) {
+                SharedPreferences prefs = ctx.getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+                examId = prefs.getString("examId", null);
+                Log.d(TAG, "examId from prefs = " + examId);
+            }
+        }
 
-        btnNextQuestion.setOnClickListener(v -> showNextQuestion(v));
+        // studentId from prefs
+        Context ctx = getContext();
+        if (ctx != null) {
+            SharedPreferences prefs = ctx.getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+            studentId = prefs.getString("studentId", null);
+            Log.d(TAG, "studentId from prefs = " + studentId);
+        }
+
+        if (examId == null || studentId == null) {
+            tvExamTitle.setText("Missing exam or student");
+            Toast.makeText(requireContext(), "Exam or student not set", Toast.LENGTH_SHORT).show();
+            return view;
+        }
+
+        loadExamAndQuestions(examId);
+
+        btnNextQuestion.setOnClickListener(this::onNextClicked);
 
         return view;
     }
 
-    private void loadExamAndQuestions() {
-        SharedPreferences prefs = getActivity().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
-        String examId = prefs.getString("examId", "sampleExam");
-
+    private void loadExamAndQuestions(@NonNull String examId) {
         db.collection("exams").document(examId)
                 .get()
                 .addOnSuccessListener(examDoc -> {
-                    if (examDoc.exists()) {
+                    if (examDoc != null && examDoc.exists()) {
                         String examTitle = examDoc.getString("examTitle");
-                        tvExamTitle.setText(examTitle);
+                        tvExamTitle.setText(examTitle != null ? examTitle : "Exam");
 
                         db.collection("exams").document(examId)
                                 .collection("questions")
@@ -85,110 +119,172 @@ public class ExamFragment extends Fragment {
                                         q.questionText = doc.getString("questionText");
                                         q.type = doc.getString("type");
 
-                                        List<String> optionsFromDoc = null;
                                         Object o = doc.get("options");
-                                        if (o instanceof List) {
-                                            optionsFromDoc = (List<String>) o;
-                                        }
-
-                                        List<String> finalOptions;
-                                        if ("matching".equalsIgnoreCase(q.type)
-                                                && (optionsFromDoc == null || optionsFromDoc.isEmpty())) {
-                                            finalOptions = matchingPool.isEmpty() ? Collections.emptyList() : new ArrayList<>(matchingPool);
+                                        if (o instanceof List<?>) {
+                                            List<?> rawList = (List<?>) o;
+                                            List<String> stringList = new ArrayList<>();
+                                            for (Object item : rawList) {
+                                                if (item != null) stringList.add(item.toString());
+                                            }
+                                            q.options = stringList;
                                         } else {
-                                            finalOptions = optionsFromDoc;
+                                            q.options = null;
                                         }
 
-                                        q.options = finalOptions;
-
-                                        if ("matching".equalsIgnoreCase(q.type) && finalOptions != null) {
-                                            matchingPool.addAll(finalOptions);
+                                        if ("matching".equalsIgnoreCase(q.type) && q.options != null) {
+                                            matchingPool.addAll(q.options);
                                         }
 
                                         q.correctAnswer = doc.get("correctAnswer");
                                         questionList.add(q);
                                     }
 
-                                    if (!questionList.isEmpty()) {
+                                    if (questionList.isEmpty()) {
+                                        tvQuestion.setText("No questions in this exam.");
+                                        Toast.makeText(requireContext(), "No questions found for this exam.", Toast.LENGTH_SHORT).show();
+                                        btnNextQuestion.setEnabled(false);
+                                    } else {
                                         currentQuestionIndex = 0;
+                                        score = 0;
+                                        studentAnswers.clear();
+                                        btnNextQuestion.setEnabled(true);
                                         showQuestion(questionList.get(currentQuestionIndex));
                                     }
                                 })
-                                .addOnFailureListener(e -> Log.e("ExamFragment", "Error loading questions", e));
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Error loading questions", e);
+                                    Toast.makeText(requireContext(), "Failed to load questions", Toast.LENGTH_SHORT).show();
+                                });
+                    } else {
+                        tvExamTitle.setText("Exam not found");
+                        Toast.makeText(requireContext(), "Exam not found", Toast.LENGTH_SHORT).show();
                     }
                 })
-                .addOnFailureListener(e -> Log.e("ExamFragment", "Error loading exam", e));
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading exam", e);
+                    Toast.makeText(requireContext(), "Failed to load exam", Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void showQuestion(QuestionModel q) {
-        tvQuestion.setText(q.questionText);
+        if (q == null) {
+            tvQuestion.setText("Question will appear here");
+            return;
+        }
+        tvQuestion.setText(q.questionText != null ? q.questionText : "Question will appear here");
 
         radioGroupOptions.setVisibility(View.GONE);
         radioGroupTrueFalse.setVisibility(View.GONE);
         spinnerMatching.setVisibility(View.GONE);
 
-        if ("multiple-choice".equalsIgnoreCase(q.type) && q.options != null) {
+        if ("multiple-choice".equalsIgnoreCase(q.type) && q.options != null && !q.options.isEmpty()) {
             radioGroupOptions.setVisibility(View.VISIBLE);
             radioGroupOptions.removeAllViews();
+            radioGroupOptions.clearCheck();
+
             for (String option : q.options) {
-                RadioButton rb = new RadioButton(getContext());
+                RadioButton rb = new RadioButton(requireContext());
+                rb.setId(View.generateViewId());
                 rb.setText(option);
                 radioGroupOptions.addView(rb);
             }
+
         } else if ("true-false".equalsIgnoreCase(q.type)) {
             radioGroupTrueFalse.setVisibility(View.VISIBLE);
+            radioGroupTrueFalse.removeAllViews();
+            radioGroupTrueFalse.clearCheck();
+
+            RadioButton rbTrue = new RadioButton(requireContext());
+            rbTrue.setId(View.generateViewId());
+            rbTrue.setText("True");
+            radioGroupTrueFalse.addView(rbTrue);
+
+            RadioButton rbFalse = new RadioButton(requireContext());
+            rbFalse.setId(View.generateViewId());
+            rbFalse.setText("False");
+            radioGroupTrueFalse.addView(rbFalse);
+
         } else if ("matching".equalsIgnoreCase(q.type)) {
             spinnerMatching.setVisibility(View.VISIBLE);
+
+            List<String> pool = new ArrayList<>(matchingPool);
+            if (pool.isEmpty() && q.options != null) pool.addAll(q.options);
+
+            Collections.shuffle(pool); // ✅ randomize every time
+
             ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                    getContext(),
+                    requireContext(),
                     android.R.layout.simple_spinner_item,
-                    q.options != null ? q.options : matchingPool
+                    pool
             );
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spinnerMatching.setAdapter(adapter);
+
+            spinnerMatching.setEnabled(!pool.isEmpty());
+        } else {
+            tvQuestion.setText(q.questionText != null ? q.questionText : "Unsupported question type");
         }
     }
 
     private void saveAnswer(QuestionModel q) {
+        if (q == null) return;
+
         String answer = null;
 
         if ("multiple-choice".equalsIgnoreCase(q.type)) {
             int selectedId = radioGroupOptions.getCheckedRadioButtonId();
             if (selectedId != -1) {
-                RadioButton selected = radioGroupOptions.findViewById(selectedId);
-                answer = selected.getText().toString();
+                RadioButton rb = radioGroupOptions.findViewById(selectedId);
+                if (rb != null) answer = rb.getText().toString();
             }
         } else if ("true-false".equalsIgnoreCase(q.type)) {
             int selectedId = radioGroupTrueFalse.getCheckedRadioButtonId();
             if (selectedId != -1) {
-                RadioButton selected = radioGroupTrueFalse.findViewById(selectedId);
-                answer = selected.getText().toString();
+                RadioButton rb = radioGroupTrueFalse.findViewById(selectedId);
+                if (rb != null) answer = rb.getText().toString();
             }
         } else if ("matching".equalsIgnoreCase(q.type)) {
-            if (spinnerMatching.getSelectedItem() != null) {
-                answer = spinnerMatching.getSelectedItem().toString();
+            Object sel = spinnerMatching.getSelectedItem();
+            if (sel != null) answer = sel.toString();
+        }
+
+        String key = q.questionText != null ? q.questionText : "q" + currentQuestionIndex;
+        studentAnswers.put(key, answer != null ? answer : "");
+
+        // auto-score
+        if (answer != null && q.correctAnswer != null) {
+            if (q.correctAnswer instanceof List) {
+                if (((List<?>) q.correctAnswer).contains(answer)) score++;
+            } else {
+                if (answer.equalsIgnoreCase(q.correctAnswer.toString())) score++;
             }
         }
 
-        if (answer != null) {
-            studentAnswers.put(q.questionText, answer);
+        // ✅ auto-save to Firestore subcollection
+        if (examId != null && studentId != null) {
+            String docId = examId + "_" + studentId;
 
-            // ✅ Auto-score: compare answer to correctAnswer
-            if (q.correctAnswer != null) {
-                if (q.correctAnswer instanceof List) {
-                    if (((List<?>) q.correctAnswer).contains(answer)) {
-                        score++;
-                    }
-                } else {
-                    if (answer.equalsIgnoreCase(q.correctAnswer.toString())) {
-                        score++;
-                    }
-                }
-            }
+            Map<String, Object> answerData = new HashMap<>();
+            answerData.put("question", q.questionText);
+            answerData.put("answer", answer != null ? answer : "");
+            answerData.put("timestamp", System.currentTimeMillis());
+
+            db.collection("examResults")
+                    .document(docId)
+                    .collection("answers")
+                    .document("q" + currentQuestionIndex)
+                    .set(answerData)
+                    .addOnSuccessListener(aVoid -> Log.d(TAG, "Auto-saved q" + currentQuestionIndex))
+                    .addOnFailureListener(e -> Log.w(TAG, "Auto-save failed", e));
         }
     }
 
-    private void showNextQuestion(View view) {
+    private void onNextClicked(View view) {
+        if (questionList.isEmpty()) {
+            Toast.makeText(requireContext(), "No questions to answer", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         QuestionModel currentQ = questionList.get(currentQuestionIndex);
         saveAnswer(currentQ);
 
@@ -196,50 +292,64 @@ public class ExamFragment extends Fragment {
             currentQuestionIndex++;
             showQuestion(questionList.get(currentQuestionIndex));
         } else {
-            // Submit when exam finishes
-            SharedPreferences prefs = getActivity().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
-            String studentId = prefs.getString("studentId", "unknown");
-            String examId = prefs.getString("examId", "sampleExam");
-
-            submitExam(examId, studentId, studentAnswers, score, view);
+            submitExam(examId, studentId, score, view);
         }
     }
 
-    private void submitExam(String examId, String studentId, Map<String, Object> answers, int score, View view) {
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
+    private void submitExam(String examId, String studentId, int score, View view) {
+        String docId = examId + "_" + studentId;
 
         Map<String, Object> result = new HashMap<>();
         result.put("studentId", studentId);
         result.put("examId", examId);
-        result.put("answers", answers);
         result.put("score", score);
         result.put("total", questionList.size());
         result.put("status", "completed");
-        result.put("submittedAt", System.currentTimeMillis());
+        result.put("submittedAt", Timestamp.now()); // ✅ proper timestamp
 
         db.collection("examResults")
-                .document(studentId + "_" + examId)
+                .document(docId)
                 .set(result)
                 .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(getContext(), "Exam submitted!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), "Exam submitted!", Toast.LENGTH_SHORT).show();
 
-                    // ✅ Navigate to result fragment and pass score
                     Bundle bundle = new Bundle();
+                    bundle.putString("examId", examId);     // ✅ added
+                    bundle.putString("studentId", studentId); // ✅ added
                     bundle.putInt("score", score);
                     bundle.putInt("total", questionList.size());
-                    bundle.putSerializable("answers", new HashMap<>(answers));
+                    bundle.putSerializable("answers", new HashMap<>(studentAnswers));
 
-                    Navigation.findNavController(view).navigate(R.id.action_examFragment_to_examResultFragment, bundle);
+                    Navigation.findNavController(view)
+                            .navigate(R.id.action_examFragment_to_examResultFragment, bundle);
                 })
-                .addOnFailureListener(e ->
-                        Toast.makeText(getContext(), "Submission failed: " + e.getMessage(), Toast.LENGTH_LONG).show()
-                );
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Submission failed", e);
+                    Toast.makeText(requireContext(), "Submission failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 
+    // Model
     public static class QuestionModel {
         public String questionText;
         public String type;
         public List<String> options;
         public Object correctAnswer;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        requireActivity().getOnBackPressedDispatcher().addCallback(
+                this,
+                new OnBackPressedCallback(true) {
+                    @Override
+                    public void handleOnBackPressed() {
+                        // ✅ Always go back to My Exam
+                        Navigation.findNavController(requireView())
+                                .navigate(R.id.nav_exam_item_page);
+                    }
+                }
+        );
     }
 }

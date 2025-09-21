@@ -87,6 +87,7 @@ public class Exam_item_Fragment extends Fragment {
                                         Log.d("Exam_item_Fragment", "Exam found: " + doc.getData());
                                         ExamModel exam = doc.toObject(ExamModel.class);
                                         if (exam != null) {
+                                            exam.setId(doc.getId()); // ✅ store Firestore document ID
                                             examList.add(exam);
                                         }
                                     }

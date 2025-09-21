@@ -1,21 +1,22 @@
 package com.example.a3rd.adapters;
 
 import android.content.Context;
-import android.content.Intent;
+import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.navigation.NavController;
+import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.a3rd.R;
 import com.example.a3rd.models.ExamModel;
-import com.example.a3rd.ui.exam.TakeExamFragment;
 
 import java.util.List;
-
 
 public class ExamAdapter extends RecyclerView.Adapter<ExamAdapter.ExamViewHolder> {
 
@@ -49,14 +50,21 @@ public class ExamAdapter extends RecyclerView.Adapter<ExamAdapter.ExamViewHolder
             holder.tvStatus.setVisibility(View.GONE);
         }
 
-        // 👉 When user clicks, go to TakeExamActivity
         holder.itemView.setOnClickListener(v -> {
-            Intent intent = new Intent(context, TakeExamFragment.class);
-            intent.putExtra("subject", exam.getSubject());
-            intent.putExtra("teacherId", exam.getTeacherId());
-            intent.putExtra("startTime", exam.getStartTime().toDate().getTime());
-            intent.putExtra("endTime", exam.getEndTime().toDate().getTime());
-            context.startActivity(intent);
+            Bundle bundle = new Bundle();
+            bundle.putString("examId", exam.getId());  // ✅ pass Firestore document ID
+            bundle.putString("subject", exam.getSubject());
+            bundle.putString("teacherId", exam.getTeacherId());
+
+            if (exam.getStartTime() != null) {
+                bundle.putLong("startTime", exam.getStartTime().toDate().getTime()); // ✅ convert Timestamp → long
+            }
+            if (exam.getEndTime() != null) {
+                bundle.putLong("endTime", exam.getEndTime().toDate().getTime()); // ✅ convert Timestamp → long
+            }
+
+            Navigation.findNavController(v)
+                    .navigate(R.id.action_examListFragment_to_takeExamFragment, bundle);
         });
     }
 

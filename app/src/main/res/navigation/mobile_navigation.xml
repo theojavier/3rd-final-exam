@@ -3,43 +3,57 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/nav_login">
+    app:startDestination="@id/nav_login">
 
+    <!-- Home -->
     <fragment
         android:id="@+id/nav_home"
         android:name="com.example.a3rd.ui.home.HomeFragment"
         android:label="@string/menu_home"
         tools:layout="@layout/fragment_home" >
         <action
-            android:id="@+id/action_nav_home_to_nav_analytics"
+            android:id="@+id/action_nav_home_to_nav_myschedule"
             app:destination="@id/nav_myschedule" />
         <action
             android:id="@+id/action_nav_home_to_nav_exam_item_page"
             app:destination="@id/nav_exam_item_page" />
     </fragment>
+
+    <!-- Profile -->
     <fragment
         android:id="@+id/nav_profile"
         android:name="com.example.a3rd.ui.personal_info.ProfileFragment"
         android:label="Profile"
         tools:layout="@layout/fragment_profile" />
+
+    <!-- My Exam (Exam List) -->
     <fragment
         android:id="@+id/nav_exam_item_page"
         android:name="com.example.a3rd.ui.exam.Exam_item_Fragment"
-        android:label="Profile"
-        tools:layout="@layout/exam_layout" />
+        android:label="My Exam"
+        tools:layout="@layout/exam_layout">
 
+        <!-- Navigate from list → take exam -->
+        <action
+            android:id="@+id/action_examListFragment_to_takeExamFragment"
+            app:destination="@id/takeExamFragment"/>
+    </fragment>
+
+    <!-- Exam History -->
     <fragment
         android:id="@+id/nav_exam_history"
         android:name="com.example.a3rd.ui.personal_info.ExamHistoryFragment"
         android:label="Exam History"
         tools:layout="@layout/exam_history" />
 
+    <!-- Schedule -->
     <fragment
         android:id="@+id/nav_myschedule"
         android:name="com.example.a3rd.ui.home.ScheduleFragment"
-        android:label="menu_schedile"
-        tools:layout="@layout/activity_schedule" >
-    </fragment>
+        android:label="My Schedule"
+        tools:layout="@layout/activity_schedule" />
+
+    <!-- Login -->
     <fragment
         android:id="@+id/nav_login"
         android:name="com.example.a3rd.ui.auth.LoginFragment"
@@ -53,34 +67,42 @@
             app:destination="@id/nav_home" />
     </fragment>
 
+    <!-- Forgot -->
     <fragment
         android:id="@+id/nav_forgot"
         android:name="com.example.a3rd.ui.auth.ForgotFragment"
         android:label="Forgot Password"
         tools:layout="@layout/forget" />
+
+    <!-- Reset Password -->
     <fragment
         android:id="@+id/nav_reset_password"
         android:name="com.example.a3rd.ui.auth.ResetPasswordFragment"
-        android:label="Forgot Password"
+        android:label="Reset Password"
         tools:layout="@layout/reset_password" />
-    <!-- Exam Fragment -->
+
+    <!-- Exam (taking exam process) -->
     <fragment
         android:id="@+id/examFragment"
         android:name="com.example.a3rd.ui.exam.ExamFragment"
         android:label="Exam"
         tools:layout="@layout/exam">
-
-        <!-- 👇 Action: go to Result Fragment -->
         <action
             android:id="@+id/action_examFragment_to_examResultFragment"
             app:destination="@id/examResultFragment" />
     </fragment>
 
-    <!-- Exam Result Fragment -->
+    <!-- Exam Result -->
     <fragment
         android:id="@+id/examResultFragment"
         android:name="com.example.a3rd.ui.exam.ExamResultFragment"
         android:label="Exam Result"
         tools:layout="@layout/fragment_exam_result" />
 
+    <!-- Take Exam -->
+    <fragment
+        android:id="@+id/takeExamFragment"
+        android:name="com.example.a3rd.ui.exam.TakeExamFragment"
+        android:label="Take Exam"
+        tools:layout="@layout/take_exam" />
 </navigation>
