@@ -15,9 +15,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.a3rd.R;
-import com.example.a3rd.adapters.ExamAdapter;
-import com.example.a3rd.adapters.ExamHistoryAdapter;
-import com.example.a3rd.models.ExamModel;
+import com.example.a3rd.adapters.ExamAdapterhistory;
+import com.example.a3rd.models.ExamHistoryModel;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -27,8 +26,8 @@ import java.util.List;
 public class ExamHistoryFragment extends Fragment {
 
     private RecyclerView recyclerHistory;
-    private ExamAdapter adapter;
-    private List<ExamModel> examList;
+    private ExamAdapterhistory adapter;
+    private List<ExamHistoryModel> examList;
     private FirebaseFirestore db;
 
 
@@ -46,7 +45,7 @@ public class ExamHistoryFragment extends Fragment {
         recyclerHistory.setLayoutManager(new LinearLayoutManager(getContext()));
 
         examList = new ArrayList<>();
-        adapter = new ExamAdapter(getContext(), examList);
+        adapter = new ExamAdapterhistory(getContext(), examList);
         recyclerHistory.setAdapter(adapter);
 
         db = FirebaseFirestore.getInstance();
@@ -56,59 +55,59 @@ public class ExamHistoryFragment extends Fragment {
     }
 
     private void loadExams() {
-        // 👇 Get logged-in studentId
         SharedPreferences prefs = getActivity().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
         String currentStudentId = prefs.getString("studentId", null);
 
         if (currentStudentId == null) {
-            Log.e("Exam_item_Fragment", "No studentId found in SharedPreferences");
+            Log.e("ExamHistoryFragment", "❌ No studentId found in SharedPreferences");
             return;
         }
 
-        // 1️⃣ Get student’s program and yearBlock
-        db.collection("users")
-                .whereEqualTo("studentId", currentStudentId)
-                .limit(1)
+        Log.d("ExamHistoryFragment", "✅ Using studentId: " + currentStudentId);
+
+        db.collection("examResults")
                 .get()
-                .addOnSuccessListener(userQuery -> {
-                    if (!userQuery.isEmpty()) {
-                        DocumentSnapshot userDoc = userQuery.getDocuments().get(0);
-                        String studentProgram = userDoc.getString("program");
-                        String studentYearBlock = userDoc.getString("yearBlock");
+                .addOnSuccessListener(examIds -> {
+                    Log.d("ExamHistoryFragment", "✅ Found " + examIds.size() + " exam(s) in examResults");
+                    examList.clear();
 
-                        Log.d("Exam_item_Fragment", "Student program: " + studentProgram + ", yearBlock: " + studentYearBlock);
+                    for (DocumentSnapshot examDoc : examIds) {
+                        String examId = examDoc.getId();
+                        Log.d("ExamHistoryFragment", "➡ Checking examId: " + examId);
 
-                        // 2️⃣ Load exams only for this program + yearBlock
-                        db.collection("exams")
-                                .whereEqualTo("program", studentProgram)
-                                .whereEqualTo("yearBlock", studentYearBlock)
+                        db.collection("examResults")
+                                .document(examId)
+                                .collection(currentStudentId)   // 👈 studentId is a subcollection
+                                .document("result")
                                 .get()
-                                .addOnSuccessListener(query -> {
-                                    examList.clear();
-                                    for (DocumentSnapshot doc : query) {
-                                        Log.d("Exam_item_Fragment", "Exam found: " + doc.getData());
-                                        ExamModel exam = doc.toObject(ExamModel.class);
+                                .addOnSuccessListener(studentDoc -> {
+                                    if (studentDoc.exists()) {
+                                        Log.d("ExamHistoryFragment", "✅ Result FOUND for examId: " + examId + " studentId: " + currentStudentId);
+                                        Log.d("ExamHistoryFragment", "🔥 Raw data: " + studentDoc.getData());
+
+                                        ExamHistoryModel exam = studentDoc.toObject(ExamHistoryModel.class);
                                         if (exam != null) {
-                                            exam.setId(doc.getId()); // ✅ store Firestore document ID
+                                            exam.setId(examId); // store examId
+                                            Log.d("ExamHistoryFragment", "📌 Parsed Exam -> Id: " + exam.getId()
+                                                    + ", Status: " + exam.getStatus()
+                                                    + ", SubmittedAt: " + exam.getSubmittedAt());
+
                                             examList.add(exam);
+                                            adapter.notifyDataSetChanged();
+                                        } else {
+                                            Log.e("ExamHistoryFragment", "❌ Could not parse ExamHistoryModel for examId: " + examId);
                                         }
+                                    } else {
+                                        Log.w("ExamHistoryFragment", "⚠ No result found for examId: " + examId + " and studentId: " + currentStudentId);
                                     }
-
-                                    if (examList.isEmpty()) {
-                                        Log.w("Exam_item_Fragment", "No exams found for program/yearBlock");
-                                    }
-
-                                    adapter.notifyDataSetChanged();
                                 })
-                                .addOnFailureListener(e ->
-                                        Log.e("Exam_item_Fragment", "Error loading exams", e)
-                                );
-                    } else {
-                        Log.w("Exam_item_Fragment", "No matching user found for studentId: " + currentStudentId);
+                                .addOnFailureListener(e -> {
+                                    Log.e("ExamHistoryFragment", "❌ Error fetching student exam for examId: " + examId, e);
+                                });
                     }
                 })
                 .addOnFailureListener(e ->
-                        Log.e("Exam_item_Fragment", "Error loading user", e)
+                        Log.e("ExamHistoryFragment", "❌ Error loading examResults", e)
                 );
     }
 }

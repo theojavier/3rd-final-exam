@@ -19,7 +19,6 @@ import com.example.a3rd.R;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.*;
@@ -42,6 +41,7 @@ public class ExamFragment extends Fragment {
 
     private String examId;
     private String studentId;
+    private String subject;   // ✅ added field for subject
 
     public ExamFragment() { }
 
@@ -108,6 +108,7 @@ public class ExamFragment extends Fragment {
                 .addOnSuccessListener(examDoc -> {
                     if (examDoc != null && examDoc.exists()) {
                         String examTitle = examDoc.getString("examTitle");
+                        subject = examDoc.getString("subject");  // ✅ fetch subject
                         tvExamTitle.setText(examTitle != null ? examTitle : "Exam");
 
                         db.collection("exams").document(examId)
@@ -232,7 +233,6 @@ public class ExamFragment extends Fragment {
     private void saveAnswer(QuestionModel q) {
         if (q == null) return;
 
-        // Capture the current index immediately to avoid race conditions with async callbacks
         final int qIndex = currentQuestionIndex;
 
         String answer = null;
@@ -252,7 +252,6 @@ public class ExamFragment extends Fragment {
             }
 
         } else if ("matching".equalsIgnoreCase(q.type)) {
-            // Ensure spinner has a selection (defensive)
             if (spinnerMatching.getSelectedItemPosition() < 0 && spinnerMatching.getAdapter() != null && spinnerMatching.getAdapter().getCount() > 0) {
                 spinnerMatching.setSelection(0);
             }
@@ -260,11 +259,9 @@ public class ExamFragment extends Fragment {
             if (sel != null) answer = sel.toString();
         }
 
-        // Build a stable key using the captured index to avoid duplicate keys if two questions have the same text
         String key = (q.questionText != null ? q.questionText : "q" + qIndex) + " (q" + qIndex + ")";
         studentAnswers.put(key, answer != null ? answer : "");
 
-        // Auto-score
         if (answer != null && q.correctAnswer != null) {
             if (q.correctAnswer instanceof List) {
                 if (((List<?>) q.correctAnswer).contains(answer)) score++;
@@ -273,41 +270,36 @@ public class ExamFragment extends Fragment {
             }
         }
 
-        // Auto-save into nested structure (examId / studentId / result / answers / qX)
         if (examId != null && studentId != null) {
-            final String answerDocId = "q" + qIndex;            // use captured index
+            final String answerDocId = "q" + qIndex;
             Map<String, Object> answerData = new HashMap<>();
             answerData.put("question", q.questionText);
             answerData.put("answer", answer != null ? answer : "");
             answerData.put("index", qIndex);
             answerData.put("timestamp", System.currentTimeMillis());
 
-            // Document reference for the student's "result"
             DocumentReference resultDocRef = db.collection("examResults")
-                    .document(examId)          // exam parent
-                    .collection(studentId)     // student subcollection
-                    .document("result");       // result doc
+                    .document(examId)
+                    .collection(studentId)
+                    .document("result");
 
-            // Ensure result doc exists (set in-progress status without overwriting other fields)
             Map<String, Object> inProgressUpdate = new HashMap<>();
             inProgressUpdate.put("examId", examId);
             inProgressUpdate.put("studentId", studentId);
             inProgressUpdate.put("status", "in-progress");
             inProgressUpdate.put("lastSavedAt", com.google.firebase.Timestamp.now());
 
-            // Use captured answerDocId inside callbacks so it's stable
             resultDocRef.set(inProgressUpdate, com.google.firebase.firestore.SetOptions.merge())
                     .addOnSuccessListener(aVoid -> {
-                        // now save the answer under answers subcollection using the captured id
                         resultDocRef.collection("answers")
                                 .document(answerDocId)
                                 .set(answerData)
-                                .addOnSuccessListener(aVoid2 -> Log.d(TAG, "Auto-saved answer " + answerDocId + " (qIndex=" + qIndex + ")"))
-                                .addOnFailureListener(e -> Log.w(TAG, "Auto-save answer failed for " + answerDocId + " (qIndex=" + qIndex + ")", e));
+                                .addOnSuccessListener(aVoid2 -> Log.d(TAG, "Auto-saved answer " + answerDocId))
+                                .addOnFailureListener(e -> Log.w(TAG, "Auto-save answer failed", e));
                     })
-                    .addOnFailureListener(e -> Log.w(TAG, "Ensure result doc failed for examId=" + examId + " studentId=" + studentId, e));
+                    .addOnFailureListener(e -> Log.w(TAG, "Ensure result doc failed", e));
         } else {
-            Log.w(TAG, "saveAnswer: examId or studentId null (examId=" + examId + ", studentId=" + studentId + ")");
+            Log.w(TAG, "saveAnswer: examId or studentId null");
         }
     }
 
@@ -339,10 +331,10 @@ public class ExamFragment extends Fragment {
         result.put("examId", examId);
         result.put("score", score);
         result.put("total", questionList.size());
-        result.put("status", "completed"); // ✅ mark finished
+        result.put("subject", subject != null ? subject : ""); // ✅ save subject
+        result.put("status", "completed");
         result.put("submittedAt", Timestamp.now());
 
-        // ✅ Save into the new path
         db.collection("examResults")
                 .document(examId)
                 .collection(studentId)
@@ -351,12 +343,12 @@ public class ExamFragment extends Fragment {
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(requireContext(), "Exam submitted!", Toast.LENGTH_SHORT).show();
 
-                    // Pass data to ExamResultFragment
                     Bundle bundle = new Bundle();
                     bundle.putString("examId", examId);
                     bundle.putString("studentId", studentId);
                     bundle.putInt("score", score);
                     bundle.putInt("total", questionList.size());
+                    bundle.putString("subject", subject); // ✅ pass subject to result screen
                     bundle.putSerializable("answers", new HashMap<>(studentAnswers));
 
                     Navigation.findNavController(view)
@@ -368,7 +360,6 @@ public class ExamFragment extends Fragment {
                 });
     }
 
-    // simple question model
     public static class QuestionModel {
         public String questionText;
         public String type;

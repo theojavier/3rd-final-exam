@@ -140,6 +140,12 @@ public class MainActivity extends AppCompatActivity {
                 navController.navigate(R.id.nav_myschedule);
                 drawer.closeDrawers();
                 return true;
+            } else if (id == R.id.nav_exam_history) {
+                navController.navigate(R.id.nav_exam_history);
+                drawer.closeDrawers();
+            }else if (id == R.id.nav_profile) {
+                navController.navigate(R.id.nav_profile);
+                drawer.closeDrawers();
             }
 
             // fallback → let NavigationUI handle other clicks
