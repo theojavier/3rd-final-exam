@@ -80,9 +80,13 @@ public class ScheduleFragment extends Fragment {
                             Date endDate = endTS.toDate();
 
                             // Optionally keep filter for current week. For testing you may disable this.
-                            // if (!isInCurrentWeek(startDate)) { Log.d(TAG, "Skipping (not current week): " + docId); continue; }
+                             if (!isInCurrentWeek(startDate))
+                             { Log.d(TAG, "Skipping (not current week): " + docId);
+                                 continue;
+                             }
 
                             // CALL the placement function (fixed — you were not calling this)
+
                             placeExamOnSchedule(subject, startDate, endDate);
                         }
                     } else {
@@ -99,10 +103,11 @@ public class ScheduleFragment extends Fragment {
         cal.set(Calendar.SECOND, 0);
         cal.set(Calendar.MILLISECOND, 0);
 
-        // start of week Monday
+        // Monday
         cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
         Date weekStart = cal.getTime();
 
+        // Sunday
         cal.add(Calendar.DAY_OF_WEEK, 6);
         Date weekEnd = cal.getTime();
 

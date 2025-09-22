@@ -13,7 +13,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
+import com.google.firebase.Timestamp;
+import java.util.Calendar;
+import java.util.Date;
 import com.example.a3rd.R;
 import com.example.a3rd.adapters.ExamAdapter;
 import com.example.a3rd.models.ExamModel;
@@ -63,7 +65,24 @@ public class Exam_item_Fragment extends Fragment {
             return;
         }
 
-        // 1️⃣ Get student’s program and yearBlock
+        // 1️⃣ Get start & end of current week
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+
+        // Set to Monday
+        calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        Date weekStart = calendar.getTime();
+
+        // Set to Sunday
+        calendar.add(Calendar.DAY_OF_WEEK, 6);
+        Date weekEnd = calendar.getTime();
+
+        Log.d("Exam_item_Fragment", "Week range: " + weekStart + " → " + weekEnd);
+
+        // 2️⃣ Get student’s program and yearBlock
         db.collection("users")
                 .whereEqualTo("studentId", currentStudentId)
                 .limit(1)
@@ -76,31 +95,32 @@ public class Exam_item_Fragment extends Fragment {
 
                         Log.d("Exam_item_Fragment", "Student program: " + studentProgram + ", yearBlock: " + studentYearBlock);
 
-                        // 2️⃣ Load exams only for this program + yearBlock
+                        // 3️⃣ Load exams only for this program + yearBlock + current week
                         db.collection("exams")
                                 .whereEqualTo("program", studentProgram)
                                 .whereEqualTo("yearBlock", studentYearBlock)
-                                .get()
-                                .addOnSuccessListener(query -> {
+                                .whereGreaterThanOrEqualTo("startTime", new Timestamp(weekStart))
+                                .whereLessThanOrEqualTo("endTime", new Timestamp(weekEnd))
+                                .addSnapshotListener((querySnapshot, e) -> {
+                                    if (e != null) {
+                                        Log.e("Exam_item_Fragment", "Listen failed", e);
+                                        return;
+                                    }
+
                                     examList.clear();
-                                    for (DocumentSnapshot doc : query) {
-                                        Log.d("Exam_item_Fragment", "Exam found: " + doc.getData());
-                                        ExamModel exam = doc.toObject(ExamModel.class);
-                                        if (exam != null) {
-                                            exam.setId(doc.getId()); // ✅ store Firestore document ID
-                                            examList.add(exam);
+                                    if (querySnapshot != null) {
+                                        for (DocumentSnapshot doc : querySnapshot) {
+                                            ExamModel exam = doc.toObject(ExamModel.class);
+                                            if (exam != null) {
+                                                exam.setId(doc.getId());
+                                                examList.add(exam);
+                                            }
                                         }
                                     }
 
-                                    if (examList.isEmpty()) {
-                                        Log.w("Exam_item_Fragment", "No exams found for program/yearBlock");
-                                    }
-
                                     adapter.notifyDataSetChanged();
-                                })
-                                .addOnFailureListener(e ->
-                                        Log.e("Exam_item_Fragment", "Error loading exams", e)
-                                );
+                                });
+
                     } else {
                         Log.w("Exam_item_Fragment", "No matching user found for studentId: " + currentStudentId);
                     }

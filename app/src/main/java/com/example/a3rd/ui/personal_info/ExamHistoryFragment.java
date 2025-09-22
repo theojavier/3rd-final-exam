@@ -7,104 +7,110 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.a3rd.R;
+import com.example.a3rd.adapters.ExamAdapter;
 import com.example.a3rd.adapters.ExamHistoryAdapter;
-import com.example.a3rd.models.ExamHistory;
-import com.example.a3rd.ui.exam.ExamResultFragment;
+import com.example.a3rd.models.ExamModel;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ExamHistoryFragment extends Fragment {
 
-    private RecyclerView recyclerView;
-    private ExamHistoryAdapter adapter;
-    private List<ExamHistory> historyList;
+    private RecyclerView recyclerHistory;
+    private ExamAdapter adapter;
+    private List<ExamModel> examList;
+    private FirebaseFirestore db;
 
-    private FirebaseFirestore firestore;
-    private String currentStudentId;
 
+    public ExamHistoryFragment() {
+        // Required empty constructor
+    }
+
+    @Nullable
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.exam_history, container, false);
 
-        recyclerView = view.findViewById(R.id.recyclerExamHistory);
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        recyclerHistory = view.findViewById(R.id.recyclerExamHistory);
+        recyclerHistory.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        historyList = new ArrayList<>();
-        adapter = new ExamHistoryAdapter(historyList);
-        recyclerView.setAdapter(adapter);
+        examList = new ArrayList<>();
+        adapter = new ExamAdapter(getContext(), examList);
+        recyclerHistory.setAdapter(adapter);
 
-        firestore = FirebaseFirestore.getInstance();
-
-        // ✅ Get studentId from SharedPreferences
-        SharedPreferences prefs = requireContext().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
-        currentStudentId = prefs.getString("studentId", null);
-
-        // Load exam history only for this student
-        loadExamHistory();
-
-        // ✅ Handle item clicks
-        adapter.setOnItemClickListener((history, examId) -> {
-            Bundle bundle = new Bundle();
-            bundle.putString("examId", examId);
-
-            Navigation.findNavController(requireView())
-                    .navigate(R.id.examResultFragment, bundle);
-        });
+        db = FirebaseFirestore.getInstance();
+        loadExams();
 
         return view;
     }
 
-    private void loadExamHistory() {
+    private void loadExams() {
+        // 👇 Get logged-in studentId
+        SharedPreferences prefs = getActivity().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+        String currentStudentId = prefs.getString("studentId", null);
+
         if (currentStudentId == null) {
-            Toast.makeText(requireContext(), "No student logged in", Toast.LENGTH_SHORT).show();
+            Log.e("Exam_item_Fragment", "No studentId found in SharedPreferences");
             return;
         }
 
-        firestore.collection("examResults")
-                .whereEqualTo("studentId", currentStudentId) // ✅ filter by logged-in student
+        // 1️⃣ Get student’s program and yearBlock
+        db.collection("users")
+                .whereEqualTo("studentId", currentStudentId)
+                .limit(1)
                 .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        historyList.clear();
-                        for (DocumentSnapshot doc : task.getResult()) {
-                            String examId = doc.getString("examId");
-                            String score = String.valueOf(doc.getLong("score"));
-                            String total = String.valueOf(doc.getLong("total"));
-                            String status = doc.getString("status");
+                .addOnSuccessListener(userQuery -> {
+                    if (!userQuery.isEmpty()) {
+                        DocumentSnapshot userDoc = userQuery.getDocuments().get(0);
+                        String studentProgram = userDoc.getString("program");
+                        String studentYearBlock = userDoc.getString("yearBlock");
 
-                            // optional: format date from submittedAt
-                            long timestamp = doc.contains("submittedAt")
-                                    ? doc.getLong("submittedAt")
-                                    : 0;
-                            String date = (timestamp > 0)
-                                    ? new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",
-                                    java.util.Locale.getDefault()).format(new java.util.Date(timestamp))
-                                    : "N/A";
+                        Log.d("Exam_item_Fragment", "Student program: " + studentProgram + ", yearBlock: " + studentYearBlock);
 
-                            // 🔹 Subject isn’t in your schema → set examId as subject placeholder
-                            historyList.add(new ExamHistory(examId, examId, date, score + "/" + total));
-                        }
-                        adapter.notifyDataSetChanged();
+                        // 2️⃣ Load exams only for this program + yearBlock
+                        db.collection("exams")
+                                .whereEqualTo("program", studentProgram)
+                                .whereEqualTo("yearBlock", studentYearBlock)
+                                .get()
+                                .addOnSuccessListener(query -> {
+                                    examList.clear();
+                                    for (DocumentSnapshot doc : query) {
+                                        Log.d("Exam_item_Fragment", "Exam found: " + doc.getData());
+                                        ExamModel exam = doc.toObject(ExamModel.class);
+                                        if (exam != null) {
+                                            exam.setId(doc.getId()); // ✅ store Firestore document ID
+                                            examList.add(exam);
+                                        }
+                                    }
+
+                                    if (examList.isEmpty()) {
+                                        Log.w("Exam_item_Fragment", "No exams found for program/yearBlock");
+                                    }
+
+                                    adapter.notifyDataSetChanged();
+                                })
+                                .addOnFailureListener(e ->
+                                        Log.e("Exam_item_Fragment", "Error loading exams", e)
+                                );
                     } else {
-                        Toast.makeText(requireContext(),
-                                "Error loading exam history",
-                                Toast.LENGTH_SHORT).show();
-                        Log.e("ExamHistory", "Error getting data", task.getException());
+                        Log.w("Exam_item_Fragment", "No matching user found for studentId: " + currentStudentId);
                     }
-                });
+                })
+                .addOnFailureListener(e ->
+                        Log.e("Exam_item_Fragment", "Error loading user", e)
+                );
     }
 }
+
+

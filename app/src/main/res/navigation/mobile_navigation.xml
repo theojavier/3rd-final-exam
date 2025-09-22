@@ -44,7 +44,13 @@
         android:id="@+id/nav_exam_history"
         android:name="com.example.a3rd.ui.personal_info.ExamHistoryFragment"
         android:label="Exam History"
-        tools:layout="@layout/exam_history" />
+        tools:layout="@layout/exam_history">
+
+        <!-- History → Take Exam -->
+        <action
+            android:id="@+id/action_examhistory_to_takeExamFragment"
+            app:destination="@id/takeExamFragment"/>
+    </fragment>
 
     <!-- Schedule -->
     <fragment
@@ -105,4 +111,5 @@
         android:name="com.example.a3rd.ui.exam.TakeExamFragment"
         android:label="Take Exam"
         tools:layout="@layout/take_exam" />
+
 </navigation>

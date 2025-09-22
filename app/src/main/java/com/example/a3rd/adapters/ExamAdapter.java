@@ -51,20 +51,33 @@ public class ExamAdapter extends RecyclerView.Adapter<ExamAdapter.ExamViewHolder
         }
 
         holder.itemView.setOnClickListener(v -> {
-            Bundle bundle = new Bundle();
-            bundle.putString("examId", exam.getId());  // ✅ pass Firestore document ID
-            bundle.putString("subject", exam.getSubject());
-            bundle.putString("teacherId", exam.getTeacherId());
+            try {
+                Bundle bundle = new Bundle();
+                bundle.putString("examId", exam.getId());
+                bundle.putString("subject", exam.getSubject());
+                bundle.putString("teacherId", exam.getTeacherId());
 
-            if (exam.getStartTime() != null) {
-                bundle.putLong("startTime", exam.getStartTime().toDate().getTime()); // ✅ convert Timestamp → long
-            }
-            if (exam.getEndTime() != null) {
-                bundle.putLong("endTime", exam.getEndTime().toDate().getTime()); // ✅ convert Timestamp → long
-            }
+                if (exam.getStartTime() != null) {
+                    bundle.putLong("startTime", exam.getStartTime().toDate().getTime());
+                }
+                if (exam.getEndTime() != null) {
+                    bundle.putLong("endTime", exam.getEndTime().toDate().getTime());
+                }
 
-            Navigation.findNavController(v)
-                    .navigate(R.id.action_examListFragment_to_takeExamFragment, bundle);
+                NavController navController = Navigation.findNavController(v);
+                int currentDestId = navController.getCurrentDestination().getId();
+
+                if (currentDestId == R.id.nav_exam_item_page) {
+                    navController.navigate(R.id.action_examListFragment_to_takeExamFragment, bundle);
+                } else if (currentDestId == R.id.nav_exam_history) {
+                    navController.navigate(R.id.action_examhistory_to_takeExamFragment, bundle);
+                } else {
+                    Log.e("ExamAdapter", "Unexpected destination: " + currentDestId);
+                }
+
+            } catch (Exception e) {
+                Log.e("ExamAdapter", "Navigation failed: " + e.getMessage(), e);
+            }
         });
     }
 

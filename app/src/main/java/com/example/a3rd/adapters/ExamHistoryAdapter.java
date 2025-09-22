@@ -6,6 +6,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.a3rd.R;
@@ -15,58 +16,54 @@ import java.util.List;
 
 public class ExamHistoryAdapter extends RecyclerView.Adapter<ExamHistoryAdapter.ViewHolder> {
 
-    private final List<ExamHistory> historyList;
-    private OnItemClickListener listener;
+    private final List<ExamHistory> examList;
+    private final OnExamClickListener listener;
 
-    // Listener interface
-    public interface OnItemClickListener {
-        void onItemClick(ExamHistory history, String examId);
+    // ✅ Functional interface for clicks
+    public interface OnExamClickListener {
+        void onExamClick(ExamHistory exam);
     }
 
-    public void setOnItemClickListener(OnItemClickListener listener) {
+    public ExamHistoryAdapter(List<ExamHistory> examList, OnExamClickListener listener) {
+        this.examList = examList;
         this.listener = listener;
-    }
-
-    public ExamHistoryAdapter(List<ExamHistory> historyList) {
-        this.historyList = historyList;
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.exam_history_item, parent, false);
+                .inflate(R.layout.exam_history_item, parent, false); // make sure you have exam_history_item.xml
         return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        ExamHistory history = historyList.get(position);
+        ExamHistory exam = examList.get(position);
 
-        holder.txtSubject.setText(history.getSubject());
-        holder.txtDate.setText(history.getDate());
-        holder.txtScore.setText(history.getScore());
+        holder.txtSubject.setText(exam.getSubject());
+        holder.txtDate.setText(exam.getDate());
+        holder.txtStatus.setText(exam.getStatus());
 
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onItemClick(history, history.getExamId()); // 👈 pass examId too
-            }
-        });
+        // ✅ Handle item click
+        holder.cardView.setOnClickListener(v -> listener.onExamClick(exam));
     }
 
     @Override
     public int getItemCount() {
-        return historyList.size();
+        return examList.size();
     }
 
-    public static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView txtSubject, txtDate, txtScore;
+    static class ViewHolder extends RecyclerView.ViewHolder {
+        TextView txtSubject, txtDate, txtStatus;
+        CardView cardView;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             txtSubject = itemView.findViewById(R.id.txtSubject);
             txtDate = itemView.findViewById(R.id.txtDate);
-            txtScore = itemView.findViewById(R.id.txtScore);
+            txtStatus = itemView.findViewById(R.id.txtStatus);
+            cardView = (CardView) itemView; // root is CardView
         }
     }
 }
