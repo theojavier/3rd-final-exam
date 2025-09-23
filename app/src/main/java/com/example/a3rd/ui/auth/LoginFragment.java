@@ -1,6 +1,5 @@
 package com.example.a3rd.ui.auth;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -24,11 +23,15 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 public class LoginFragment extends Fragment {
 
+    private static final String TAG = "LoginFragment";
+
     private EditText etStudentId, etPassword;
     private Button btnLogin;
     private TextView tvForgot;
 
     private FirebaseFirestore db;
+
+    public LoginFragment() {}
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -70,19 +73,40 @@ public class LoginFragment extends Fragment {
 
                             if (storedPassword != null && storedPassword.equals(password)) {
                                 if ("student".equalsIgnoreCase(role)) {
-                                    // ✅ Save new session, overwrite old one
-                                    SharedPreferences prefs = requireContext().getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+                                    // ✅ Save new session
+                                    SharedPreferences prefs = requireContext().getSharedPreferences("MyAppPrefs", android.content.Context.MODE_PRIVATE);
+                                    String userDocId = document.getId(); // Firestore doc ID
                                     prefs.edit()
                                             .clear() // wipe old session
-                                            .putString("userId", document.getId())   // Firestore document ID
-                                            .putString("studentId", studentId)       // Student’s own ID
-                                            .putBoolean("isLoggedIn", true)          // logged in flag
+                                            .putString("userId", userDocId)   // Firestore document ID
+                                            .putString("studentId", studentId) // Student’s own ID
+                                            .putBoolean("isLoggedIn", true)    // logged in flag
                                             .apply();
-
-                                    Toast.makeText(getActivity(), "Welcome Student!", Toast.LENGTH_SHORT).show();
                                     if (getActivity() instanceof MainActivity) {
                                         ((MainActivity) getActivity()).loadUserProfile();
                                     }
+
+                                    Toast.makeText(getActivity(), "Welcome Student!", Toast.LENGTH_SHORT).show();
+
+                                    // Ensure notifications exist and start the listener (use userDocId)
+                                    if (getActivity() instanceof MainActivity) {
+                                        MainActivity main = (MainActivity) requireActivity();
+                                        main.ensureUserNotificationsCollectionMinimal(userDocId, () -> {
+                                            // This will run after the "welcome" notification is created
+                                            main.startNotificationListener(userDocId);
+                                            Log.d(TAG, "Created minimal notification subcollection");
+                                        });
+
+                                        // Create notification docs for matched exams, then start listener.
+                                        main.ensureUserNotificationsCollection(userDocId, () -> {
+                                            // Start the listener after ensure finishes (safe to call even if already started)
+                                            main.startNotificationListener(userDocId);
+
+                                        });
+
+                                    }
+
+                                    // Navigate to home
                                     Navigation.findNavController(v).navigate(R.id.nav_home);
                                 } else {
                                     Toast.makeText(getActivity(), "Access denied (not a student)", Toast.LENGTH_LONG).show();
@@ -97,7 +121,7 @@ public class LoginFragment extends Fragment {
                     })
                     .addOnFailureListener(e -> {
                         Toast.makeText(getActivity(), "Login failed", Toast.LENGTH_LONG).show();
-                        Log.e("LoginFragment", "Firestore error", e);
+                        Log.e(TAG, "Firestore error", e);
                     });
         });
 

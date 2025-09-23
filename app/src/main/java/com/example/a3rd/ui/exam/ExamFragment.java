@@ -20,6 +20,7 @@ import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.SetOptions;
 
 import java.util.*;
 
@@ -42,6 +43,7 @@ public class ExamFragment extends Fragment {
     private String examId;
     private String studentId;
     private String subject;   // ✅ added field for subject
+    private String teacherId;
 
     public ExamFragment() { }
 
@@ -110,6 +112,7 @@ public class ExamFragment extends Fragment {
                         String examTitle = examDoc.getString("examTitle");
                         subject = examDoc.getString("subject");  // ✅ fetch subject
                         tvExamTitle.setText(examTitle != null ? examTitle : "Exam");
+                        teacherId = examDoc.getString("teacherId");
 
                         db.collection("exams").document(examId)
                                 .collection("questions")
@@ -236,6 +239,11 @@ public class ExamFragment extends Fragment {
         final int qIndex = currentQuestionIndex;
 
         String answer = null;
+        db.collection("examResults")
+                .document(examId)
+                .set(Collections.singletonMap("teacherId", teacherId), SetOptions.merge())
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Ensured root examResult doc has teacherId"))
+                .addOnFailureListener(e -> Log.w(TAG, "Failed to set teacherId on root examResult doc", e));
 
         if ("multiple-choice".equalsIgnoreCase(q.type)) {
             int selectedId = radioGroupOptions.getCheckedRadioButtonId();

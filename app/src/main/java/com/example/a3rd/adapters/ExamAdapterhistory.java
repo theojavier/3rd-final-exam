@@ -30,10 +30,9 @@ public class ExamAdapterhistory extends RecyclerView.Adapter<ExamAdapterhistory.
         this.examList = examList;
     }
 
-    @NonNull
     @Override
     public ExamViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.item_exam, parent, false);
+        View view = LayoutInflater.from(context).inflate(R.layout.exam_history_item, parent, false);
         return new ExamViewHolder(view);
     }
 
@@ -45,29 +44,32 @@ public class ExamAdapterhistory extends RecyclerView.Adapter<ExamAdapterhistory.
                 + ", Status: " + exam.getStatus()
                 + ", Score: " + exam.getScore() + "/" + exam.getTotal());
 
-        holder.tvSubject.setText("Exam: " + exam.getSubject());
+        // Subject
+        holder.txtSubject.setText(exam.getSubject() != null ? exam.getSubject() : "Unknown Subject");
 
+        // Submitted date
         if (exam.getSubmittedAt() != null) {
             Date date = exam.getSubmittedAt().toDate();
             String formatted = DateFormat.format("yyyy-MM-dd hh:mm a", date).toString();
-            holder.tvLoginTime.setText("SUBMITTED: " + formatted);
+            holder.txtDate.setText("SUBMITTED: " + formatted);
         } else {
-            holder.tvLoginTime.setText("SUBMITTED: N/A");
+            holder.txtDate.setText("SUBMITTED: N/A");
         }
 
+        // Status
         if ("complete".equalsIgnoreCase(exam.getStatus()) || "completed".equalsIgnoreCase(exam.getStatus())) {
-            holder.tvStatus.setVisibility(View.VISIBLE);
-            holder.tvStatus.setText("✔ Completed");
+            holder.txtStatus.setVisibility(View.VISIBLE);
+            holder.txtStatus.setText("✔ Completed");
         } else {
-            holder.tvStatus.setVisibility(View.GONE);
+            holder.txtStatus.setVisibility(View.GONE);
         }
 
         // 👉 Handle click
         holder.itemView.setOnClickListener(v -> {
             try {
                 Bundle bundle = new Bundle();
-                bundle.putString("examId", exam.getId());   // Firestore doc id
-                bundle.putString("subject", exam.getExamId());
+                bundle.putString("examId", exam.getId());
+                bundle.putString("subject", exam.getSubject());
                 bundle.putDouble("score", exam.getScore());
                 bundle.putDouble("total", exam.getTotal());
 
@@ -86,14 +88,13 @@ public class ExamAdapterhistory extends RecyclerView.Adapter<ExamAdapterhistory.
     }
 
     public static class ExamViewHolder extends RecyclerView.ViewHolder {
-        TextView tvSubject, tvStatus, tvLoginTime, tvPosted;
+        TextView txtSubject, txtDate, txtStatus;
 
         public ExamViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvSubject = itemView.findViewById(R.id.tv_subject);
-            tvStatus = itemView.findViewById(R.id.tv_status);
-            tvLoginTime = itemView.findViewById(R.id.tv_login_time);
-            tvPosted = itemView.findViewById(R.id.tv_posted);
+            txtSubject = itemView.findViewById(R.id.txtSubject);
+            txtDate = itemView.findViewById(R.id.txtDate);
+            txtStatus = itemView.findViewById(R.id.txtStatus);
         }
     }
 }

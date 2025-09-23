@@ -3,6 +3,7 @@ package com.example.a3rd;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -13,6 +14,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.navigation.NavController;
@@ -22,10 +24,20 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.bumptech.glide.Glide;
 import com.example.a3rd.databinding.ActivityMainBinding;
-import com.google.android.material.navigation.NavigationView;
+import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.lang.reflect.Method;
 
 public class MainActivity extends AppCompatActivity {
@@ -37,9 +49,19 @@ public class MainActivity extends AppCompatActivity {
     private DrawerLayout drawer;
     private String profileImageUrl;
 
-    // Header views (cached)
+    // Firestore
+    private FirebaseFirestore db;
+    private ListenerRegistration notificationListener;
+
+    // Header views
     private ImageView headerImage;
     private TextView headerName, headerSection;
+
+    // Badge view
+    private TextView badgeTextView;
+
+    // For building dropdown items
+    private final List<NotificationEntry> notificationEntries = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,13 +70,15 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        db = FirebaseFirestore.getInstance();
+
         setSupportActionBar(binding.appBarMain.toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
         drawer = binding.drawerLayout;
-        NavigationView navigationView = binding.navView;
+        androidx.appcompat.widget.Toolbar toolbar = binding.appBarMain.toolbar;
+        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
 
-        // Top-level destinations
         mAppBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_home,
                 R.id.nav_myschedule,
@@ -67,9 +91,9 @@ public class MainActivity extends AppCompatActivity {
         )
                 .setOpenableLayout(drawer)
                 .build();
-        final NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
+
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
-        NavigationUI.setupWithNavController(navigationView, navController);
+        NavigationUI.setupWithNavController(binding.navView, navController);
 
         // Logo click -> home
         ImageView logo = findViewById(R.id.toolbar_logo);
@@ -92,13 +116,13 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Ensure nav header exists (some setups don't inflate it automatically)
-        if (navigationView.getHeaderCount() == 0) {
-            navigationView.inflateHeaderView(R.layout.nav_header_main);
+        // Ensure nav header exists
+        if (binding.navView.getHeaderCount() == 0) {
+            binding.navView.inflateHeaderView(R.layout.nav_header_main);
         }
 
         // Get header view safely
-        View headerView = navigationView.getHeaderView(0);
+        View headerView = binding.navView.getHeaderView(0);
         if (headerView == null) {
             Log.e(TAG, "Navigation header view is null. Check nav_view header layout.");
             return;
@@ -115,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
         headerName = headerView.findViewById(R.id.nav_header_name);
         headerSection = headerView.findViewById(R.id.nav_header_section);
 
-        // Dropdown toggle
+        // Dropdown toggle (profile)
         final boolean[] expanded = {false};
         headerTop.setOnClickListener(v -> {
             expanded[0] = !expanded[0];
@@ -125,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
 
         myProfile.setOnClickListener(v -> navController.navigate(R.id.nav_profile));
         history.setOnClickListener(v -> navController.navigate(R.id.nav_exam_history));
-        navigationView.setNavigationItemSelectedListener(item -> {
+        binding.navView.setNavigationItemSelectedListener(item -> {
             int id = item.getItemId();
 
             if (id == R.id.nav_exam_item_page) {
@@ -143,41 +167,328 @@ public class MainActivity extends AppCompatActivity {
             } else if (id == R.id.nav_exam_history) {
                 navController.navigate(R.id.nav_exam_history);
                 drawer.closeDrawers();
-            }else if (id == R.id.nav_profile) {
+            } else if (id == R.id.nav_profile) {
                 navController.navigate(R.id.nav_profile);
                 drawer.closeDrawers();
             }
 
-            // fallback → let NavigationUI handle other clicks
             return NavigationUI.onNavDestinationSelected(item, navController)
                     || super.onOptionsItemSelected(item);
         });
 
-        // initial load (single fetch)
+        // Initial header load
         loadUserProfile();
+
+        // If already logged in, attach notification listener (use userId stored in prefs)
+        SharedPreferences prefs = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+        String userDocId = prefs.getString("userId", null);
+        if (userDocId != null) {
+            Log.d(TAG, "userDocId found on start, ensuring notifications and starting listener for " + userDocId);
+            // Ensure notification docs exist (asynchronously), then start listener immediately (listener will pick up any created docs)
+            ensureUserNotificationsCollection(userDocId, null);
+            startNotificationListener(userDocId);
+        } else {
+            Log.d(TAG, "no userId on start; notifications listener not started");
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main, menu);
+
+        // Notifications Badge
+        MenuItem notificationItem = menu.findItem(R.id.action_notifications);
+        notificationItem.setActionView(R.layout.notification_badge);
+
+        View actionView = notificationItem.getActionView();
+        badgeTextView = actionView.findViewById(R.id.notification_badge);
+
+        // Start with hidden badge
+        badgeTextView.setVisibility(View.GONE);
+
+        // Click bell -> ensure per-user notification docs exist, then show dropdown of notifications
+        actionView.setOnClickListener(v -> fetchNotificationsAndShowDropdown());
+
+        return true;
     }
 
     /**
-     * Single Firestore fetch to populate the header. Public so other fragments (Login) can call it
-     * immediately after saving userId to SharedPreferences.
+     * Start listening for unseen notifications (viewed == false) for a given userDocId.
      */
+    public void startNotificationListener(@NonNull String userDocId) {
+        if (notificationListener != null) {
+            notificationListener.remove();
+        }
+
+        Log.d(TAG, "startNotificationListener -> " + userDocId);
+
+        notificationListener = db.collection("users")
+                .document(userDocId)
+                .collection("notifications")
+                .whereEqualTo("viewed", false)
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null) {
+                        Log.e(TAG, "notificationListener failed", e);
+                        return;
+                    }
+
+                    int unseen = 0;
+                    if (snapshots != null) {
+                        unseen = snapshots.size();
+                    }
+                    Log.d(TAG, "notificationListener unseen count = " + unseen);
+                    updateBadge(unseen);
+                });
+    }
+
+    private void updateBadge(int count) {
+        if (badgeTextView != null) {
+            if (count > 0) {
+                badgeTextView.setVisibility(View.VISIBLE);
+                badgeTextView.setText(String.valueOf(count));
+            } else {
+                badgeTextView.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    /**
+     * Ensure the user has notification documents for recent exams that match their program/yearBlock.
+     * If onComplete != null it will run after processing (success or failure).
+     */
+    public void ensureUserNotificationsCollection(@NonNull String userDocId, Runnable onComplete) {
+        db.collection("users").document(userDocId).get()
+                .addOnSuccessListener(userDoc -> {
+                    if (!userDoc.exists()) {
+                        if (onComplete != null) onComplete.run();
+                        return;
+                    }
+
+                    String program = userDoc.getString("program");
+                    String yearBlock = userDoc.getString("yearBlock");
+                    if (program == null || yearBlock == null) {
+                        if (onComplete != null) onComplete.run();
+                        return;
+                    }
+
+                    db.collection("exams")
+                            .whereEqualTo("program", program)
+                            .whereEqualTo("yearBlock", yearBlock)
+                            .orderBy("createdAt", Query.Direction.DESCENDING)
+                            .limit(5)
+                            .get()
+                            .addOnSuccessListener(snapshot -> {
+                                if (snapshot == null || snapshot.isEmpty()) {
+                                    if (onComplete != null) onComplete.run();
+                                    return;
+                                }
+
+                                final int total = snapshot.size();
+                                final int[] processed = {0};
+
+                                for (QueryDocumentSnapshot examDoc : snapshot) {
+                                    String examId = examDoc.getId();
+                                    String subject = examDoc.getString("subject");
+                                    Timestamp createdAt = examDoc.getTimestamp("createdAt");
+
+                                    DocumentReference notifRef = db.collection("users")
+                                            .document(userDocId)
+                                            .collection("notifications")
+                                            .document(examId);
+
+                                    // If the notification doc already exists do nothing, otherwise create with viewed=false and copy subject/createdAt
+                                    notifRef.get().addOnSuccessListener(notifDoc -> {
+                                        if (!notifDoc.exists()) {
+                                            Map<String, Object> data = new HashMap<>();
+                                            data.put("viewed", false);
+                                            if (subject != null) data.put("subject", subject);
+                                            if (createdAt != null) data.put("createdAt", createdAt);
+                                            notifRef.set(data)
+                                                    .addOnSuccessListener(aVoid -> {
+                                                        Log.d(TAG, "Created notif for user " + userDocId + " / exam " + examId);
+                                                        processed[0]++;
+                                                        if (processed[0] == total && onComplete != null) onComplete.run();
+                                                    })
+                                                    .addOnFailureListener(e -> {
+                                                        Log.e(TAG, "Failed to create notif for exam " + examId, e);
+                                                        processed[0]++;
+                                                        if (processed[0] == total && onComplete != null) onComplete.run();
+                                                    });
+                                        } else {
+                                            // If it exists we might want to ensure it has subject/createdAt; only update missing fields
+                                            Map<String, Object> updates = new HashMap<>();
+                                            boolean needUpdate = false;
+                                            if (notifDoc.get("subject") == null && subject != null) {
+                                                updates.put("subject", subject);
+                                                needUpdate = true;
+                                            }
+                                            if (notifDoc.get("createdAt") == null && createdAt != null) {
+                                                updates.put("createdAt", createdAt);
+                                                needUpdate = true;
+                                            }
+                                            if (needUpdate) {
+                                                notifRef.update(updates)
+                                                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Updated notif meta for " + examId))
+                                                        .addOnFailureListener(e -> Log.w(TAG, "Failed to update notif meta", e));
+                                            }
+                                            processed[0]++;
+                                            if (processed[0] == total && onComplete != null) onComplete.run();
+                                        }
+                                    }).addOnFailureListener(e -> {
+                                        Log.e(TAG, "Failed reading notif doc for exam " + examId, e);
+                                        processed[0]++;
+                                        if (processed[0] == total && onComplete != null) onComplete.run();
+                                    });
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed fetching exams for ensureUserNotificationsCollection", e);
+                                if (onComplete != null) onComplete.run();
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed fetching user doc for ensureUserNotificationsCollection", e);
+                    if (onComplete != null) onComplete.run();
+                });
+    }
+
+    /**
+     * Called by the bell click handler. Ensures notification docs are present and then shows a dropdown
+     * that lists the latest notifications (subject + time). Clicking an item opens the exam (and marks viewed).
+     */
+    private void fetchNotificationsAndShowDropdown() {
+        SharedPreferences prefs = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+        String userDocId = prefs.getString("userId", null);
+        if (userDocId == null) {
+            Toast.makeText(this, "Please login to see notifications", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Make sure notifications exist for recent exams, then show dropdown when done
+        ensureUserNotificationsCollection(userDocId, () -> showNotificationsDropdown(userDocId));
+    }
+
+    private void showNotificationsDropdown(@NonNull String userDocId) {
+        db.collection("users")
+                .document(userDocId)
+                .collection("notifications")
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(5)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot == null || snapshot.isEmpty()) {
+                        Toast.makeText(this, "No notifications", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    List<DocumentSnapshot> notifDocs = snapshot.getDocuments();
+                    String[] items = new String[notifDocs.size()];
+                    final String[] examIds = new String[notifDocs.size()];
+
+                    for (int i = 0; i < notifDocs.size(); i++) {
+                        DocumentSnapshot n = notifDocs.get(i);
+                        String examId = n.getId();
+                        examIds[i] = examId;
+
+                        String subject = n.getString("subject");
+                        Timestamp createdAt = n.getTimestamp("createdAt");
+                        String time = (createdAt != null) ? DateFormat.format("MMM d, yyyy h:mm a", createdAt.toDate()).toString() : "N/A";
+
+                        items[i] = (subject != null ? subject : "Exam") + " (" + time + ")";
+                    }
+
+                    new AlertDialog.Builder(this)
+                            .setTitle("Notifications")
+                            .setItems(items, (dialog, which) -> {
+                                String examId = examIds[which];
+                                openExamFromNotificationWithUser(examId, userDocId);
+                            })
+                            .show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load notifications for dropdown", e);
+                    Toast.makeText(this, "Failed to load notifications", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    /**
+     * Mark notification as viewed inside users/{userDocId}/notifications/{examId} and navigate to exam.
+     */
+    public void openExamFromNotificationWithUser(String examId, @NonNull String userDocId) {
+        Log.d(TAG, "openExamFromNotificationWithUser -> marking viewed and navigating. examId=" + examId);
+
+        DocumentReference notifRef = db.collection("users")
+                .document(userDocId)
+                .collection("notifications")
+                .document(examId);
+
+        Map<String, Object> viewedMap = new HashMap<>();
+        viewedMap.put("viewed", true);
+
+        notifRef.set(viewedMap)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Marked notification viewed for exam " + examId))
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to mark notification viewed", e));
+
+        // then navigate to exam details (reuse your existing logic)
+        db.collection("exams").document(examId).get()
+                .addOnSuccessListener(doc -> {
+                    if (!doc.exists()) {
+                        Log.w(TAG, "Exam document not found: " + examId);
+                        Toast.makeText(this, "Exam not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    long startMillis = -1;
+                    long endMillis = -1;
+                    if (doc.getTimestamp("startTime") != null) {
+                        startMillis = doc.getTimestamp("startTime").toDate().getTime();
+                    }
+                    if (doc.getTimestamp("endTime") != null) {
+                        endMillis = doc.getTimestamp("endTime").toDate().getTime();
+                    }
+
+                    Bundle bundle = new Bundle();
+                    bundle.putString("examId", examId);
+                    bundle.putLong("startTime", startMillis);
+                    bundle.putLong("endTime", endMillis);
+
+                    NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
+                    navController.navigate(R.id.takeExamFragment, bundle);
+
+                    // restart listener (it listens to viewed==false so it will update badge)
+                    startNotificationListener(userDocId);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to fetch exam doc for " + examId, e);
+                    Toast.makeText(this, "Failed to open exam", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    // Convenience wrapper called elsewhere in your code (keeps older method names but uses userDocId)
+    public void openExamFromNotification(String examId) {
+        SharedPreferences prefs = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
+        String userDocId = prefs.getString("userId", null);
+        if (userDocId == null) {
+            Toast.makeText(this, "Please login to open notification", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        openExamFromNotificationWithUser(examId, userDocId);
+    }
+
     public void loadUserProfile() {
         Log.d(TAG, "loadUserProfile() called");
 
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
         SharedPreferences prefs = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
-        String userId = prefs.getString("userId", null);
-        Log.d(TAG, "userId from prefs = " + userId);
+        String userDocId = prefs.getString("userId", null);
 
-        // Clear header immediately so old values don't flash
         resetHeader();
 
-        if (userId == null) {
+        if (userDocId == null) {
             Log.d(TAG, "no userId saved; header left cleared");
             return;
         }
 
-        DocumentReference userRef = db.collection("users").document(userId);
+        DocumentReference userRef = db.collection("users").document(userDocId);
 
         userRef.get()
                 .addOnSuccessListener(doc -> {
@@ -188,7 +499,6 @@ public class MainActivity extends AppCompatActivity {
                         String semester = doc.getString("semester");
                         profileImageUrl = doc.getString("profileImage");
 
-                        // update header text
                         headerName.setText(name != null ? name : "No Name");
 
                         StringBuilder sectionText = new StringBuilder();
@@ -198,7 +508,6 @@ public class MainActivity extends AppCompatActivity {
                         String section = sectionText.toString().trim();
                         headerSection.setText(!section.isEmpty() ? section : "No Section");
 
-                        // handle Imgur page links => i.imgur.com direct + .jpg
                         if (profileImageUrl != null && !profileImageUrl.isEmpty()) {
                             if (profileImageUrl.contains("imgur.com") && !profileImageUrl.contains("i.imgur.com")) {
                                 profileImageUrl = profileImageUrl.replace("imgur.com", "i.imgur.com") + ".jpg";
@@ -214,7 +523,7 @@ public class MainActivity extends AppCompatActivity {
                             headerImage.setImageResource(R.drawable.ic_person);
                         }
                     } else {
-                        Log.w(TAG, "User doc not found for id: " + userId);
+                        Log.w(TAG, "User doc not found for id: " + userDocId);
                     }
                 })
                 .addOnFailureListener(e -> {
@@ -224,14 +533,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void resetHeader() {
-        // Clear text and image right away
         if (headerName != null) headerName.setText("No Name");
         if (headerSection != null) headerSection.setText("No Section");
         if (headerImage != null) {
-            // clear any active Glide request and set placeholder
             try {
                 Glide.with(this).clear(headerImage);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) {
+            }
             headerImage.setImageResource(R.drawable.ic_person);
         }
     }
@@ -239,32 +547,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Still refresh if activity is recreated
         loadUserProfile();
     }
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main, menu);
 
-        // Notifications Badge
-        MenuItem notificationItem = menu.findItem(R.id.action_notifications);
-        notificationItem.setActionView(R.layout.notification_badge);
-
-        View actionView = notificationItem.getActionView();
-        TextView badgeTextView = actionView.findViewById(R.id.notification_badge);
-
-        int notificationCount = 0;
-        if (notificationCount > 0) {
-            badgeTextView.setText(String.valueOf(notificationCount));
-            badgeTextView.setVisibility(View.VISIBLE);
-        } else {
-            badgeTextView.setVisibility(View.GONE);
-        }
-
-        return true;
-    }
-
-    // show icons in overflow
     @Override
     public boolean onMenuOpened(int featureId, Menu menu) {
         if (menu != null && menu.getClass().getSimpleName().equalsIgnoreCase("MenuBuilder")) {
@@ -289,10 +574,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.action_notifications) {
-            Toast.makeText(this, "Notifications clicked", Toast.LENGTH_SHORT).show();
-            return true;
-        } else if (id == R.id.action_logout) {
+        if (id == R.id.action_logout) {
             logoutUser();
             return true;
         }
@@ -303,20 +585,65 @@ public class MainActivity extends AppCompatActivity {
     private void logoutUser() {
         SharedPreferences prefs = getSharedPreferences("MyAppPrefs", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
-
-        // ❌ Do NOT remove userId (next login will overwrite it)
         editor.remove("authToken");
         editor.putBoolean("isLoggedIn", false);
-
+        editor.remove("userId");
+        editor.remove("studentId");
         editor.apply();
 
         resetHeader();
-
         Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
 
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
         navController.popBackStack(R.id.nav_home, true);
         navController.navigate(R.id.nav_login);
+
+        // Stop listening to notifications
+        if (notificationListener != null) {
+            notificationListener.remove();
+            notificationListener = null;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (notificationListener != null) {
+            notificationListener.remove();
+            notificationListener = null;
+        }
+    }
+
+    // Simple holder for building dropdown items
+    private static class NotificationEntry {
+        final String examId;
+        final String subject;
+        final Timestamp createdAt;
+
+        NotificationEntry(String examId, String subject, Timestamp createdAt) {
+            this.examId = examId;
+            this.subject = subject;
+            this.createdAt = createdAt;
+        }
+    }
+    public void ensureUserNotificationsCollectionMinimal(@NonNull String userDocId, Runnable onComplete) {
+        DocumentReference userRef = db.collection("users").document(userDocId);
+
+        // Firestore doesn't allow empty collections, so we just check if user exists
+        userRef.get()
+                .addOnSuccessListener(userDoc -> {
+                    if (userDoc.exists()) {
+                        Log.d("ensureNotif", "User exists, ready to create notifications when needed: " + userDocId);
+                    } else {
+                        Log.w("ensureNotif", "User document does not exist: " + userDocId);
+                    }
+
+                    if (onComplete != null) onComplete.run();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e("ensureNotif", "Failed to fetch user", e);
+                    if (onComplete != null) onComplete.run();
+                });
     }
 
 }
